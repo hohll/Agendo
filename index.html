@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Modern Week Calendar (Vanilla JS - Zero Dependencies)</title>
+  
+  <!-- Calendar Library Styles -->
+  <link rel="stylesheet" href="week-calendar.css" />
+  
+  <!-- Demo Application Styles -->
+  <link rel="stylesheet" href="demo.css" />
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>Modern Week Calendar <span class="badge">Zero Dependencies</span></h1>
+    </div>
+    <div id="log-toast"></div>
+  </header>
+
+  <div class="info-bar">
+    <div>
+      💡 <strong>Try it:</strong> Click & drag on empty slots to create events &bull; Drag events to move &bull; Drag top/bottom edges to resize &bull; Click to edit.
+    </div>
+  </div>
+
+  <div id="calendar-container"></div>
+
+  <!-- Calendar Library Script -->
+  <script src="week-calendar.js"></script>
+
+  <!-- Demo Application Script (fetches events.json) -->
+  <script src="demo.js"></script>
+</body>
+</html>
+
