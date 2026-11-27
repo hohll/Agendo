@@ -2458,7 +2458,6 @@ class Agendo {
   // Draws the events again (for plugins whose display changes with time).
   redraw() { this._changed(); }
 
-  // A short message at the bottom of the calendar (refused drop, import result…).
   // A text of the interface in the calendar's language, with its {placeholders} filled from `vars`
   // ({ n } also picks the plural form). Looks in the labels option, the locale ('fr-ca'), its language
   // ('fr'), then English; an unknown key comes back as is. Plugins use it for their own texts.
@@ -2473,6 +2472,7 @@ class Agendo {
     return String(m).replace(/\{(\w+)\}/g, (all, k) => (vars[k] !== undefined ? vars[k] : all));
   }
 
+  // A short message at the bottom of the calendar (refused drop, import result…).
   notify(message, ms = 3500) {
     const el = this.el.querySelector('.ago-toast');
     el.textContent = message;

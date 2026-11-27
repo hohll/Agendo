@@ -493,6 +493,7 @@ function saveClosed() {
 // "Collapse all" while a section in view is open, else "Expand all".
 function showFoldAll() {
   const anyOpen = sections.some(s => !s.fieldset.hidden && s.isOpen());
+  foldAllBtn.dataset.open = anyOpen ? '' : 'all';   // what a click does: fold ('') or unfold ('all')
   foldAllBtn.textContent = anyOpen ? 'Collapse all' : 'Expand all';
 }
 
@@ -519,7 +520,7 @@ for (const legend of form.querySelectorAll('fieldset > legend')) {
 }
 
 foldAllBtn.addEventListener('click', () => {
-  const open = foldAllBtn.textContent === 'Expand all';
+  const open = foldAllBtn.dataset.open === 'all';
   for (const s of sections) s.show(open);
   saveClosed();
   showFoldAll();
