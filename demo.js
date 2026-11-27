@@ -211,9 +211,9 @@ function buildCalendar() {
     daysToShow: prev?.view ?? 7,
     events: prev?.events ?? [],
     onFilterChange: f => logAction(`Filter: ${[...f.calendars, ...f.categories].join(', ') || 'nothing'} shown`),
-    onEventChange: (ev, action, info) => logAction(`${action}${info ? ` (${info.scope})` : ''}: "${ev.title}" ${fmt(ev.start)} – ${fmt(ev.end)}`),
-    onEventCreate: (ev, info) => logAction(`Created "${ev.title}"${info ? ` (${info.scope})` : ''}`),
-    onEventDelete: (id, info) => logAction(`Deleted event ${id}${info ? ` (${info.scope})` : ''}`)
+    onEventChange: (ev, action, info) => { logAction(`${action}${info ? ` (${info.scope})` : ''}: "${ev.title}" ${fmt(ev.start)} – ${fmt(ev.end)}`); refreshDbSoon(); },
+    onEventCreate: (ev, info) => { logAction(`Created "${ev.title}"${info ? ` (${info.scope})` : ''}`); refreshDbSoon(); },
+    onEventDelete: (id, info) => { logAction(`Deleted event ${id}${info ? ` (${info.scope})` : ''}`); refreshDbSoon(); }
   });
   showCode(opts);
   renderBgList();
@@ -227,6 +227,8 @@ function buildCalendar() {
 const storage = () => calendar.getPlugin('restStorage');
 
 function showStorageStatus() {
+  showDbPanel();
+  if (!settings.storage) document.getElementById('db-empty-status').textContent = '';
   const el = document.getElementById('storage-status');
   if (!storage()) {
     el.innerHTML = 'Needs the Node.js server: <code>node server/server.js</code>';
@@ -236,6 +238,83 @@ function showStorageStatus() {
   storage().health()
     .then(h => { el.textContent = `Connected: ${h.storage === 'sqlite' ? 'SQLite database' : 'JSON file'} · ${num(h.events)} events stored`; })
     .catch(() => { el.innerHTML = 'Server not reachable: start it with <code>node server/server.js</code> and open its address'; });
+}
+
+// --- Database panel: the rows server/server.js has stored (GET /api/rows), last changed first ---
+// Rows added or changed since the previous refresh are highlighted; deleted ones are counted.
+
+const DB_LIMIT = 100;
+let dbSnapshot = null;   // id → updated_at (or the row's JSON for the JSON-file storage) at the last refresh
+let dbTimer = 0;
+
+// Whether the rows are on screen: storage on, sidebar open, content shown.
+const dbShown = () => settings.storage && panel.classList.contains('is-open') && !document.getElementById('db-body').hidden;
+
+// The Database section follows "Database storage"; its content is shown or hidden by its button
+// (remembered in this browser).
+const DB_OPEN_KEY = 'ago-demo-db-open';
+function showDbPanel() {
+  let open = false;
+  try { open = localStorage.getItem(DB_OPEN_KEY) === '1'; } catch { /* storage unavailable */ }
+  document.getElementById('db-panel').hidden = !settings.storage;
+  document.getElementById('db-body').hidden = !open;
+  const btn = document.getElementById('db-toggle');
+  btn.setAttribute('aria-expanded', open);
+  btn.textContent = open ? 'Hide database content' : 'Show database content';
+  if (dbShown()) refreshDb();
+}
+
+async function refreshDb() {
+  if (!dbShown()) return;
+  const status = document.getElementById('db-status'), list = document.getElementById('db-rows');
+  let res;
+  try {
+    const r = await fetch('api/rows?limit=' + DB_LIMIT, { headers: { Accept: 'application/json' } });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    res = await r.json();
+  } catch {
+    status.innerHTML = 'Needs the Node.js server: <code>node server/server.js</code>, then open its address';
+    list.replaceChildren();
+    dbSnapshot = null;
+    return;
+  }
+  const stamp = row => row.updated_at ?? JSON.stringify(row.data);
+  const prev = dbSnapshot, next = new Map(res.rows.map(row => [row.id, stamp(row)]));
+  const changed = new Set(prev ? res.rows.filter(row => prev.get(row.id) !== stamp(row)).map(row => row.id) : []);
+  const deleted = prev ? [...prev.keys()].filter(id => !next.has(id)).length : 0;
+  dbSnapshot = next;
+
+  const time = iso => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'medium' }) : '—');
+  list.replaceChildren(...res.rows.map(row => {
+    const li = document.createElement('li');
+    li.classList.toggle('is-changed', changed.has(row.id));
+    const det = document.createElement('details'), sum = document.createElement('summary');
+    const title = document.createElement('span'), meta = document.createElement('span');
+    title.className = 'db-title';
+    title.textContent = row.data.title || '(no title)';
+    meta.className = 'db-meta';
+    meta.textContent = `id ${row.id}${row.recurring ? ' · recurring' : ''} · ${row.updated_at ? `updated ${time(row.updated_at)}` : 'no change time (JSON file)'}`;
+    sum.append(title, meta);
+    const pre = document.createElement('pre');
+    pre.textContent = JSON.stringify({ start_ms: `${row.start_ms} (${time(new Date(row.start_ms).toISOString())})`,
+      end_ms: `${row.end_ms} (${time(new Date(row.end_ms).toISOString())})`, recurring: row.recurring, data: row.data }, null, 2);
+    det.append(sum, pre);
+    li.append(det);
+    return li;
+  }));
+  if (!res.rows.length) list.innerHTML = '<li class="db-empty">No rows stored</li>';
+
+  const diff = [changed.size && `${changed.size} changed`, deleted && `${deleted} deleted`].filter(Boolean).join(', ');
+  status.textContent = `${res.storage === 'sqlite' ? 'SQLite' : 'JSON file'} · ${num(res.total)} rows` +
+    (res.total > res.rows.length ? ` (last ${res.rows.length} shown)` : '') +
+    (diff ? ` · ${diff}` : '') + ` · ${new Date().toLocaleTimeString()}`;
+}
+
+// After a change in the calendar: refresh once restStorage has sent it (sidebar open only).
+function refreshDbSoon(tries = 30) {
+  clearTimeout(dbTimer);
+  if (!dbShown()) return;
+  dbTimer = setTimeout(() => (storage()?.pending && tries > 0 ? refreshDbSoon(tries - 1) : refreshDb()), 150);
 }
 
 // --- Themes: load the CSS framework from the CDN ---
@@ -259,12 +338,49 @@ function loadFramework(name) {
 const panel = document.getElementById('customize');
 const form = document.getElementById('customize-form');
 const toggleBtn = document.getElementById('customize-btn');
+document.getElementById('db-refresh').addEventListener('click', () => refreshDb());
+// "Empty database": deletes every stored event (DELETE /api/events). A first click arms the button,
+// a second one within 5 seconds empties the database; the calendar then reloads (now empty).
+let emptyArmed = 0;
+document.getElementById('db-empty').addEventListener('click', async () => {
+  const btn = document.getElementById('db-empty'), note = document.getElementById('db-empty-status');
+  const disarm = () => { clearTimeout(emptyArmed); emptyArmed = 0; btn.textContent = 'Empty database'; btn.classList.remove('is-armed'); };
+  if (!emptyArmed) {
+    btn.textContent = 'Click again to delete every event';
+    btn.classList.add('is-armed');
+    note.textContent = 'This cannot be undone.';
+    emptyArmed = setTimeout(() => { disarm(); note.textContent = ''; }, 5000);
+    return;
+  }
+  disarm();
+  btn.disabled = true;
+  try {
+    const r = await fetch('api/events', { method: 'DELETE', headers: { Accept: 'application/json' } });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const { deleted } = await r.json();
+    note.textContent = `${num(deleted)} events deleted.`;
+    logAction(`Database emptied: ${num(deleted)} events deleted`);
+    storage()?.reload();
+    renderBgList();
+    showStorageStatus();
+  } catch (err) {
+    note.textContent = `Could not empty the database: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('db-toggle').addEventListener('click', () => {
+  const open = document.getElementById('db-body').hidden;
+  try { localStorage.setItem(DB_OPEN_KEY, open ? '1' : '0'); } catch { /* storage unavailable */ }
+  showDbPanel();
+});
 
 function setPanel(open) {
   panel.classList.toggle('is-open', open);
   panel.inert = !open;
   toggleBtn.setAttribute('aria-expanded', open);
-  if (open) panel.querySelector('[data-close]').focus();
+  if (open) { panel.querySelector('[data-close]').focus(); refreshDb(); }
   else if (panel.contains(document.activeElement) || document.activeElement === document.body) toggleBtn.focus();
 }
 
@@ -517,6 +633,7 @@ bgForm.addEventListener('submit', e => {
   if (action === 'delete' && bgEditing) {
     calendar.deleteEvent(bgEditing.id);
     storage()?.remove(bgEditing.id);
+    refreshDbSoon();
     logAction(`Deleted background event "${bgEditing.title}"`);
   } else if (action === 'save') {
     const allDay = f.allDay.checked, start = readDate(f.start);
@@ -531,9 +648,11 @@ bgForm.addEventListener('submit', e => {
     if (bgEditing) {
       calendar.updateEvent(bgEditing.id, data);
       storage()?.save(calendar.getEvents().find(x => x.id === bgEditing.id));
+      refreshDbSoon();
       logAction(`Updated background event "${data.title}"`);
     } else {
       storage()?.save(calendar.addEvent({ id: `bg-${Date.now()}`, ...data }));
+      refreshDbSoon();
       logAction(`Added background event "${data.title}"`);
     }
   }
@@ -549,6 +668,7 @@ bgList.addEventListener('click', e => {
   if (btn.dataset.edit) return openBgDialog(ev);
   calendar.deleteEvent(ev.id);
   storage()?.remove(ev.id);
+  refreshDbSoon();
   logAction(`Deleted background event "${ev.title}"`);
   renderBgList();
 });

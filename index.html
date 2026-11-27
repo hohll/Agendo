@@ -169,6 +169,23 @@
           <small class="plugin-sub storage-status" id="storage-status" aria-live="polite">Needs the Node.js server: <code>node server/server.js</code></small>
         </fieldset>
 
+        <!-- Shown only when Plugins → Database storage is on -->
+        <fieldset id="db-panel" hidden>
+          <legend>Database</legend>
+          <div class="db-actions">
+            <button type="button" class="demo-btn" id="db-toggle" aria-expanded="false" aria-controls="db-body">Show database content</button>
+            <button type="button" class="demo-btn danger-outline" id="db-empty">Empty database</button>
+          </div>
+          <small class="db-empty-status" id="db-empty-status" aria-live="polite"></small>
+          <div id="db-body" hidden>
+            <div class="db-head">
+              <small class="db-status" id="db-status" aria-live="polite"></small>
+              <button type="button" class="demo-btn" id="db-refresh">Refresh</button>
+            </div>
+            <ul class="db-rows" id="db-rows" aria-label="Stored rows, last changed first"></ul>
+          </div>
+        </fieldset>
+
         <fieldset>
           <legend>Background events</legend>
           <ul class="bg-list" id="bg-list" aria-label="Background events"></ul>

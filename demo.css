@@ -404,6 +404,35 @@ h1 {
 .chips.plugin-sub { margin-top: -4px; }
 .chips:has(input:disabled) { opacity: 0.5; }
 
+/* Database panel: the stored rows */
+.customize fieldset[hidden] { display: none; }
+.db-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.db-empty-status { margin-top: -4px; font-size: 0.75rem; color: var(--muted); }
+.db-empty-status:empty { display: none; }
+.demo-btn.danger-outline { color: #dc2626; border-color: color-mix(in srgb, #dc2626 45%, transparent); }
+.demo-btn.danger-outline:hover { background: color-mix(in srgb, #dc2626 8%, transparent); border-color: #dc2626; }
+.demo-btn.danger-outline.is-armed { color: #fff; background: #dc2626; border-color: #dc2626; }
+.db-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.db-status { font-size: 0.75rem; color: var(--muted); }
+.db-status code { font-size: 0.72rem; padding: 1px 4px; background: var(--hover-bg); border-radius: 4px; }
+.db-rows { display: flex; flex-direction: column; gap: 6px; max-height: 360px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.db-rows li { font-size: 0.8rem; border: 1px solid var(--line); border-radius: 6px; }
+.db-rows li.is-changed { border-color: var(--primary); background: var(--chip-active-bg); }
+.db-rows li.db-empty { padding: 6px 8px; color: var(--muted); border-style: dashed; }
+.db-rows summary { display: grid; gap: 2px; padding: 6px 8px; cursor: pointer; }
+.db-title { overflow: hidden; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.db-meta { color: var(--muted); font-size: 0.72rem; }
+.db-rows pre {
+  margin: 0 8px 8px;
+  padding: 8px;
+  overflow-x: auto;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: #e2e8f0;
+  background: #0f172a;
+  border-radius: 6px;
+}
+
 .storage-status { display: block; margin-top: -6px; font-size: 0.75rem; color: var(--muted); }
 .model-code { margin-top: -6px; }
 .model-code summary { font-size: 0.75rem; color: var(--muted); cursor: pointer; }

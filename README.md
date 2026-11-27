@@ -418,6 +418,13 @@ node server/server.js --reset            # start again from the sample events
 
 Open its address, then *Customize → Plugins → Database storage*: the calendar now loads its events from the database (the status line shows the storage and the number of events) and saves every change, recurring ones included. Reload the page: everything comes back.
 
+The *Database* section of the sidebar, shown while *Database storage* is on, lets you check what was stored:
+
+- *Show database content* lists the rows, last changed first, with their id and change time; open one to see the whole row. The list refreshes when the sidebar opens, after each change made in the calendar, and with *Refresh*. Rows added or changed since the previous refresh are highlighted, and deleted ones are counted. The browser remembers whether the content is shown.
+- *Empty database* deletes every stored event after a second click within 5 seconds. It cannot be undone: `node server/server.js --reset` starts again from the sample events.
+
+The database file can also be opened with any SQLite tool (`sqlite3 server/agendo.db`).
+
 | Request | Effect |
 | :--- | :--- |
 | `GET /api/health` | `{ ok, storage: 'sqlite' \| 'json', events }` |
@@ -426,6 +433,8 @@ Open its address, then *Customize → Plugins → Database storage*: the calenda
 | `POST /api/events` | Create an event (body: the event) → `201` |
 | `PUT /api/events/:id` | Replace an event → `200` |
 | `DELETE /api/events/:id` | Delete an event → `204` |
+| `DELETE /api/events` | Delete every event → `{ deleted }` |
+| `GET /api/rows?limit=N` | The stored rows as they are (`id`, `start_ms`, `end_ms`, `recurring`, `data`, `updated_at`), last changed first: `{ storage, total, rows }` (`limit` 1–500, default 100) |
 
 Each event is stored whole (custom fields included) with its time span indexed for range queries; dates are ISO instants, all-day ones `YYYY-MM-DD`. A new database gets the sample events of `events.json`, moved to the current week (`--no-seed` to start empty). The server listens on `127.0.0.1` only, serves the demo's files (never `server/` or dot files) and checks what it stores; it is a demo, without authentication. The database files are ignored by git.
 

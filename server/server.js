@@ -16,6 +16,9 @@
  *   POST   /api/events                      create (or replace) an event → 201 + the event
  *   PUT    /api/events/:id                  replace an event → 200 + the event
  *   DELETE /api/events/:id                  → 204
+ *   DELETE /api/events                      delete every event → 200 + { deleted }
+ *   GET    /api/rows?limit=N                { storage, total, rows }: the stored rows, last changed
+ *                                           first (for the demo's Database panel; limit 1–500, 100)
  * An event is stored whole (custom fields included) with its time span indexed for range queries.
  * Dates: ISO instants ('2026-11-20T08:00:00.000Z'), all-day events as 'YYYY-MM-DD'.
  */
@@ -63,7 +66,9 @@ function sqliteStore(file) {
       ON CONFLICT(id) DO UPDATE SET start_ms = excluded.start_ms, end_ms = excluded.end_ms,
       recurring = excluded.recurring, data = excluded.data, updated_at = excluded.updated_at`),
     remove: db.prepare('DELETE FROM events WHERE id = ?'),
-    count: db.prepare('SELECT COUNT(*) AS n FROM events')
+    clear: db.prepare('DELETE FROM events'),
+    count: db.prepare('SELECT COUNT(*) AS n FROM events'),
+    rows: db.prepare('SELECT id, start_ms, end_ms, recurring, data, updated_at FROM events ORDER BY updated_at DESC, id LIMIT ?')
   };
   const parse = rows => rows.map(r => JSON.parse(r.data));
   return {
@@ -80,7 +85,9 @@ function sqliteStore(file) {
       try { for (const ev of list) this.put(ev); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; }
     },
     remove(id) { return q.remove.run(id).changes > 0; },
-    count() { return q.count.get().n; }
+    clear() { return Number(q.clear.run().changes); },
+    count() { return q.count.get().n; },
+    rows(limit) { return q.rows.all(limit).map(r => ({ ...r, data: JSON.parse(r.data) })); }
   };
 }
 
@@ -98,7 +105,15 @@ function jsonStore(file) {
     put(ev) { events = events.filter(e => e.id !== ev.id).concat(ev); save(); },
     putMany(list) { const ids = new Set(list.map(e => e.id)); events = events.filter(e => !ids.has(e.id)).concat(list); save(); },
     remove(id) { const n = events.length; events = events.filter(e => e.id !== id); save(); return events.length < n; },
-    count() { return events.length; }
+    clear() { const n = events.length; events = []; save(); return n; },
+    count() { return events.length; },
+    // No change time in a JSON file: the last stored event is at the end.
+    rows(limit) {
+      return events.slice(-limit).reverse().map(ev => {
+        const s = span(ev);
+        return { id: ev.id, start_ms: s.start, end_ms: s.end, recurring: s.recurring, data: ev, updated_at: null };
+      });
+    }
   };
 }
 
@@ -194,6 +209,10 @@ const server = http.createServer(async (req, res) => {
   const match = /^\/api\/events(?:\/([^/]+))?\/?$/.exec(url.pathname);
   try {
     if (url.pathname === '/api/health') return send(res, 200, { ok: true, storage: store.kind, events: store.count() });
+    if (url.pathname === '/api/rows' && req.method === 'GET') {
+      const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 100));
+      return send(res, 200, { storage: store.kind, total: store.count(), rows: store.rows(limit) });
+    }
     if (!match) {
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'Method not allowed' });
       return serveStatic(req, res, url.pathname);
@@ -219,6 +238,8 @@ const server = http.createServer(async (req, res) => {
         store.put(ev);
         return send(res, 200, ev);
       }
+      case 'DELETE list':
+        return send(res, 200, { deleted: store.clear() });
       case 'DELETE item':
         return store.remove(id) ? send(res, 204) : send(res, 404, { error: 'No such event' });
       default:
