@@ -49,14 +49,21 @@ const DEMO_MODEL = {
 // A value as JavaScript source, functions included, to show the example model as code.
 function toCode(v, indent = '') {
   const inner = indent + '  ';
-  if (typeof v === 'function') return v.toString();
-  if (typeof v === 'string') return `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+  if (typeof v === 'function') {
+    // A function written over several lines: its body re-indented to where it now sits.
+    const lines = v.toString().split('\n');
+    const pad = Math.min(...lines.slice(1).filter(l => l.trim()).map(l => l.match(/^ */)[0].length));
+    return lines.map((l, i) => (i && Number.isFinite(pad) ? indent + l.slice(pad) : l)).join('\n');
+  }
+  if (typeof v === 'string') return `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`;
+  if (v instanceof RegExp) return String(v);
+  if (v instanceof Date) return `new Date('${v.toISOString()}')`;
   if (Array.isArray(v)) {
     if (v.every(x => typeof x !== 'object' || x === null)) return `[${v.map(x => toCode(x)).join(', ')}]`;
     return `[\n${v.map(x => inner + toCode(x, inner)).join(',\n')}\n${indent}]`;
   }
   if (v && typeof v === 'object') {
-    const props = Object.entries(v).map(([k, x]) => `${k}: ${toCode(x, inner)}`);
+    const props = Object.entries(v).map(([k, x]) => `${/^[A-Za-z_$][\w$]*$/.test(k) ? k : toCode(k)}: ${toCode(x, inner)}`);
     const flat = `{ ${props.join(', ')} }`;
     return flat.length <= 90 && !flat.includes('\n') ? flat : `{\n${props.map(x => inner + x).join(',\n')}\n${indent}}`;
   }
@@ -768,6 +775,10 @@ async function loadTest() {
   await nextPaint();
   const t0 = performance.now();
   let events = generateEvents(n, { days, isDayOff: d => calendar.isDayOff(d) });   // none on the days off
+  if (!events.length) {
+    perfResults.textContent = 'No event generated: every day of that period is a day off (Customize → Days off).';
+    return;
+  }
   rows.push([`Generate ${num(n)} events`, ms(performance.now() - t0)]);
   const t2 = performance.now();
   calendar.setEvents(events);
