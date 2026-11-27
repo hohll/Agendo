@@ -32,6 +32,7 @@ That project is itself inspired by and based on the classic [jquery-week-calenda
 - **All-day Events**: `allDay: true` events sit in an all-day row under the day headers, as bars across the days they cover; drag to create, move and resize them by whole days. They show first in month cells, as "all day" in the list, and as whole-day bars in timelines.
 - **Recurring Events**: daily, weekly (chosen weekdays), monthly (same day, or "2nd Tuesday" / "last Friday"), yearly, every N, until a date or N times, with skipped dates. Rules are a subset of iCalendar RRULE. Editing, dragging or deleting an occurrence asks *This event / This and following events / All events*, like Google Calendar.
 - **Background Events**: `display: 'background'` shades a period behind the events (lunch break, maintenance, holiday) without blocking clicks; `'inverse-background'` shades everything outside it (opening hours). Like FullCalendar's background events.
+- **Past Events Locked** (optional): `editPastEvents: false` keeps events that have ended from being moved, resized or opened in the form.
 - **Plugins**: hooks to change how events are loaded, which fields the event form has, how events look and what the popover shows. The `eventDataModel` plugin (`plugins/event-data-model.js`) defines the information an event holds as a list of fields.
 - **Event Popover**: hovering an event shows a card with all its details; short events fit their title and time on one line.
 - **Smart Overlap Handling**: Automatically detects overlapping event clusters and arranges them side-by-side cleanly.
@@ -120,6 +121,7 @@ const calendar = new Agendo('#calendar-container', {
 | `enableCreate` | `boolean` | `true` | Allow drag-to-create on empty slots. |
 | `enableMove` | `boolean` | `true` | Allow dragging events to move them. |
 | `enableResize` | `boolean` | `true` | Allow dragging handles to resize events. |
+| `editPastEvents` | `boolean` | `true` | `false`: an event that has ended (its end is before now) cannot be moved, resized or opened in the form, like an event with `editable: false`; `onEventClick` still gets it. Each occurrence of a recurring event is judged on its own. |
 | `showCurrentTime` | `boolean` | `true` | Display the real-time indicator line. |
 | `timelineCustom` | `object \| null` | `null` | Enables the `'timeline-custom'` view: `{ days: 3, slotMinutes: 30, labelMinutes: 60, slotWidth: 24, label: '3 days' }` (slot size, time-label interval, slot width in px). Use `slotMinutes: 1440` for one slot per day. |
 | `theme` | `string \| null` | `null` | Theme name: adds the class `ago-theme-<name>` to the container (`'tabler'`, `'bootstrap'`, `'bulma'`, or your own). Load the matching stylesheet. |
@@ -152,7 +154,7 @@ const calendar = new Agendo('#calendar-container', {
 | `recurrence` | `Object \| string` | Repeat rule, see below. |
 | `color` | `string` | Otherwise the colour of its category, calendar or resource. |
 | `resourceId`, `calendarId`, `categoryId` | `string` | Links to `resources`, `calendars`, `categories`. |
-| `editable` | `boolean` | `false`: the event cannot be dragged, resized or opened in the form. |
+| `editable` | `boolean` | `false`: the event cannot be dragged, resized or opened in the form (and so neither can events that have ended, with `editPastEvents: false`); its resize handles are hidden. |
 | `display` | `'auto' \| 'background' \| 'inverse-background'` | `'background'`: a shaded area behind the events, not clickable or draggable (clicks create events on it). `'inverse-background'`: shades every time **not** covered by it. See below. |
 | `location`, `description` | `string` | Shown in the hover popover (the description keeps its line breaks). |
 

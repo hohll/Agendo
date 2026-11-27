@@ -92,6 +92,7 @@ const DEFAULTS = {
   enableCreate: true,
   enableMove: true,
   enableResize: true,
+  editPastEvents: true,
   openEventOn: 'click',
   eventPopover: true,
   enableAllDay: true,
@@ -167,6 +168,7 @@ function toOptions(s) {
     enableCreate: s.enableCreate,
     enableMove: s.enableMove,
     enableResize: s.enableResize,
+    editPastEvents: s.editPastEvents,
     openEventOn: s.openEventOn,
     eventPopover: s.eventPopover,
     enableAllDay: s.enableAllDay,
@@ -313,6 +315,7 @@ function readForm() {
     enableCreate: f.enableCreate.checked,
     enableMove: f.enableMove.checked,
     enableResize: f.enableResize.checked,
+    editPastEvents: f.editPastEvents.checked,
     openEventOn: f.openEventOn.value,
     eventPopover: f.eventPopover.checked,
     enableAllDay: f.enableAllDay.checked,
@@ -335,7 +338,7 @@ function readForm() {
 // Read-only turns the editing switches off; a plugin's own options follow the plugin.
 function syncEditing() {
   const f = form.elements, ro = f.readonly.checked;
-  for (const n of ['enableCreate', 'enableMove', 'enableResize', 'enableAllDay', 'enableRecurring']) f[n].disabled = ro;
+  for (const n of ['enableCreate', 'enableMove', 'enableResize', 'editPastEvents', 'enableAllDay', 'enableRecurring']) f[n].disabled = ro;
   for (const r of form.querySelectorAll('[name="holidaysDisplay"]')) r.disabled = !f.holidays.value;
   f.conflictsBlock.disabled = !f.conflicts.checked;
 }

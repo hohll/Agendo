@@ -74,6 +74,7 @@ class Agendo {
     enableCreate: true,
     enableMove: true,
     enableResize: true,
+    editPastEvents: true,   // false: events that have ended cannot be moved, resized or opened in the form
     enableAllDay: true,     // "All day" in the event form, and drag to create in the all-day row
     enableRecurring: true,  // "Repeat" in the event form (existing recurring events still show)
     showCurrentTime: true,
@@ -601,7 +602,7 @@ class Agendo {
         el.style.top = `calc(${lane} * var(--ago-lane-h) + 3px)`;
         el.style.setProperty('--ago-ev', this._colorOf(ev));
         if (!this.o.eventPopover) el.title = ev.allDay ? `${ev.title} (all day)` : `${this.fmt.time.format(ev.start)} – ${this.fmt.time.format(ev.end)} ${ev.title}`;
-        if (handles) {
+        if (handles && this._canEdit(ev)) {
           el.append(div('ago-handle'), div('ago-handle'));
           el.children[0].dataset.edge = 'start';
           el.children[1].dataset.edge = 'end';
@@ -662,7 +663,7 @@ class Agendo {
 
   _onTlMove(e, force = false) {
     const d = this.drag, dx = e.clientX - d.x;
-    if (d.event.editable === false && d.mode !== 'create') return;
+    if (!this._canEdit(d.event) && d.mode !== 'create') return;
     if (!d.moved && !force && Math.hypot(dx, e.clientY - d.y) < 4) return;
     d.moved = !force || d.moved;
 
@@ -1062,7 +1063,7 @@ class Agendo {
         place(el, s, Math.max(e, s + 15));
         Object.assign(el.style, { left: `calc(${c * w}% + 2px)`, width: `calc(${w}% - 4px)` });
         el.style.setProperty('--ago-ev', this._colorOf(ev));
-        if (handles) {
+        if (handles && this._canEdit(ev)) {
           el.append(div('ago-handle'), div('ago-handle'));
           el.children[0].dataset.edge = 'top';
           el.children[1].dataset.edge = 'bottom';
@@ -1137,7 +1138,7 @@ class Agendo {
       if (!this.o.eventPopover) el.title = `${ev.title} (all day)`;
       el.style.setProperty('--ago-ev', this._colorOf(ev));
       pos(el, a, b, lane);
-      if (handles) {
+      if (handles && this._canEdit(ev)) {
         el.append(div('ago-handle'), div('ago-handle'));
         el.children[0].dataset.edge = 'start';
         el.children[1].dataset.edge = 'end';
@@ -1193,7 +1194,7 @@ class Agendo {
 
   _onAdMove(e, force = false) {
     const d = this.drag;
-    if (d.event.editable === false && d.mode !== 'create') return;
+    if (!this._canEdit(d.event) && d.mode !== 'create') return;
     if (!d.moved && !force && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 4) return;
     d.moved = !force || d.moved;
     const ev = d.event, c = this._adCol(e.clientX, d.rect), D = this.dates;
@@ -1295,7 +1296,7 @@ class Agendo {
     if (d.mode === 'month') return this._onMonthMove(e);
     if (d.tl) return this._onTlMove(e);
     if (d.ad) return this._onAdMove(e);
-    if (d.event.editable === false && d.mode !== 'create') return;
+    if (!this._canEdit(d.event) && d.mode !== 'create') return;
     const dx = e.clientX - d.x, dy = e.clientY - d.y;
     if (!d.moved && !force && Math.hypot(dx, dy) < 4) return;
     d.moved = !force || d.moved;
@@ -1368,7 +1369,7 @@ class Agendo {
 
   _onMonthMove(e) {
     const d = this.drag;
-    if (!d.event || !this.o.enableMove || d.event.editable === false) return;
+    if (!d.event || !this.o.enableMove || !this._canEdit(d.event)) return;
     if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 4) return;
     d.moved = true;
     const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest('.ago-cell');
@@ -1411,7 +1412,12 @@ class Agendo {
       this._lastClick = null;
     }
     if (this.o.onEventClick) this.o.onEventClick(ev);
-    else if (ev.editable !== false) this.openEditModal(ev);
+    else if (this._canEdit(ev)) this.openEditModal(ev);
+  }
+
+  // Whether the user may change this event: not editable: false, and not over when editPastEvents is false.
+  _canEdit(ev) {
+    return ev.editable !== false && (this.o.editPastEvents || ev.end > new Date());
   }
 
   _defaultHour() {
