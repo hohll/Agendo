@@ -118,7 +118,11 @@ function jsonStore(file) {
 }
 
 function openStore() {
-  if (args.includes('--reset')) for (const f of [DB_FILE, DB_FILE.replace(/\.db$/, '') + '.json']) fs.rmSync(f, { force: true });
+  // --reset: the database, SQLite's side files (an unclean stop leaves -wal / -shm / -journal, which
+  // SQLite would apply to the new file) and the JSON fallback.
+  if (args.includes('--reset')) {
+    for (const f of [DB_FILE, `${DB_FILE}-wal`, `${DB_FILE}-shm`, `${DB_FILE}-journal`, DB_FILE.replace(/\.db$/, '') + '.json']) fs.rmSync(f, { force: true });
+  }
   try {
     // node:sqlite prints an "experimental" warning on load: drop that one only.
     const emit = process.emitWarning;
