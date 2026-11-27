@@ -1740,20 +1740,21 @@ class Agendo {
   // ctx.scope: 'this' | 'following' | 'all' for an occurrence once the scope is chosen, else undefined.
   _errors(data, event, action, scope) {
     const errors = {};
+    for (const p of this._hooks.validate ?? []) Object.assign(errors, p.validate(data, { event: event ?? null, calendar: this, action, scope }) || {});
+    for (const k of Object.keys(errors)) if (!errors[k]) delete errors[k];
+    // The core's own rules, after the hooks: a hook can add a message, not clear these.
     const off = this._dayOffChange(data, event);
     if (off) errors.start = this._dayOffMessage(off);
     // editPastEvents: false — an event cannot be moved or changed so that it ends in the past.
     if (!this.o.editPastEvents && event && !isBg(event) && !this._sameDates(data, event) && toDate(data.end) <= new Date()) {
       errors.start = 'Events cannot be moved into the past';
     }
-    for (const p of this._hooks.validate ?? []) Object.assign(errors, p.validate(data, { event: event ?? null, calendar: this, action, scope }) || {});
-    for (const k of Object.keys(errors)) if (!errors[k]) delete errors[k];
     return errors;
   }
 
   // A drag and drop: refused (with a message) when a validate hook objects.
   _dropAllowed(data, action, event = data) {
-    if (!this._hooks.validate && !this.o.daysOff && this.o.editPastEvents) return true;
+    if (!this._hooks.validate && !this._hasDaysOff() && this.o.editPastEvents) return true;
     const errors = this._errors({ ...data }, event, action), first = Object.values(errors)[0];
     if (first) this.notify(first);
     return !first;
@@ -1769,9 +1770,12 @@ class Agendo {
 
   // Whether `date` is a day off. The option is read into a test, read again when its content changes
   // (an array changed in place included); Date entries count by their local day.
+  // daysOff is set: anything but null / undefined / false / '' (0 alone is Sunday).
+  _hasDaysOff() { const v = this.o.daysOff; return v != null && v !== false && v !== ''; }
+
   _isDayOff(date) {
     const src = this.o.daysOff;
-    if (!src) return false;
+    if (!this._hasDaysOff()) return false;
     if (typeof src === 'function') return !!src(date);
     const list = [].concat(src).map(x => (x instanceof Date ? dayKey(x) : x));
     const key = JSON.stringify(list);
@@ -1788,22 +1792,30 @@ class Agendo {
     return this._offTest(date);
   }
 
-  // The first day off that [start, end) touches, or null.
-  _dayOffIn(start, end) {
-    if (!this.o.daysOff || !start) return null;
+  // The days [start, end) touches, from local midnight (at most ten years of them).
+  *_days(start, end) {
     start = toDate(start);
     end = end ? toDate(end) : start;
     const last = end > start ? new Date(end - 1) : start;
-    for (let d = atMinutes(start, 0), n = 0; d <= last && n < 366; d = addDays(d, 1), n++) if (this._isDayOff(d)) return d;
+    for (let d = atMinutes(start, 0), n = 0; d <= last && n < 3660; d = addDays(d, 1), n++) yield d;
+  }
+
+  // The first day off that [start, end) touches, or null; with `before` (the event's dates before a
+  // change), only the days off it did not already cover count.
+  _dayOffIn(start, end, before = null) {
+    if (!this._hasDaysOff() || !start) return null;
+    const had = before ? new Set([...this._days(before.start, before.end)].map(dayKey)) : null;
+    for (const d of this._days(start, end)) if (this._isDayOff(d) && !had?.has(dayKey(d))) return d;
     return null;
   }
 
-  // The day off a change would put the event on, or null. Background events are not concerned, and an
-  // event whose dates do not change can still be saved (it was there before the days off were set).
+  // The day off a change would newly put the event on, or null. Background events are not concerned;
+  // an event that already covered days off (set before them, or through the API) keeps them, so it can
+  // still be saved, moved or resized as long as it covers no other day off.
   _dayOffChange(data, event) {
-    if (!this.o.daysOff || isBg(data) || (event && isBg(event))) return null;
+    if (!this._hasDaysOff() || isBg(data) || (event && isBg(event))) return null;
     if (event && this._sameDates(data, event)) return null;
-    return this._dayOffIn(data.start, data.end);
+    return this._dayOffIn(data.start, data.end, event);
   }
 
   // Whether `date` is a day off (daysOff option), for code that adds events itself.

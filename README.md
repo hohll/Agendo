@@ -125,7 +125,7 @@ const calendar = new Agendo('#calendar-container', {
 | `enableCreate` | `boolean` | `true` | Allow drag-to-create on empty slots. |
 | `enableMove` | `boolean` | `true` | Allow dragging events to move them. |
 | `enableResize` | `boolean` | `true` | Allow dragging handles to resize events. |
-| `daysOff` | `string \| Array \| Function \| null` | `null` | Days where no event can be added: `'weekend'` (Saturday and Sunday), weekday numbers (`0` = Sunday … `6` = Saturday), `'YYYY-MM-DD'` dates, mixed in an array (`['weekend', '2026-12-25']`), or `(date) => boolean`. See [Days off](#days-off). |
+| `daysOff` | `string \| number \| Array \| Function \| null` | `null` | Days where no event can be added: `'weekend'` (Saturday and Sunday), weekday numbers (`0` = Sunday … `6` = Saturday), `'YYYY-MM-DD'` dates, mixed in an array (`['weekend', '2026-12-25']`), or `(date) => boolean`. See [Days off](#days-off). |
 | `editPastEvents` | `boolean` | `true` | `false`: an event that has ended (its end is before now) cannot be moved, resized or opened in the form, like an event with `editable: false`; `onEventClick` still gets it. Each occurrence of a recurring event is judged on its own; *All events* is not offered for a series that already has an ended occurrence (it would change or delete it). An event can no longer be moved or changed so that it ends in the past. |
 | `showCurrentTime` | `boolean` | `true` | Display the real-time indicator line. |
 | `timelineCustom` | `object \| null` | `null` | Enables the `'timeline-custom'` view: `{ days: 3, slotMinutes: 30, labelMinutes: 60, slotWidth: 24, label: '3 days' }` (slot size, time-label interval, slot width in px). Use `slotMinutes: 1440` for one slot per day. |
@@ -234,7 +234,7 @@ Days off are striped in every view (day columns, headers, month and year days, t
 - move or resize an event so that it touches a day off: the event goes back, with the same message;
 - save the form with dates that touch a day off: the message shows on the start date.
 
-An event covers every day from its start to its end, so a Friday-to-Monday event touches the weekend. Code that adds events itself can ask `calendar.isDayOff(date)` (a `Date` or `'YYYY-MM-DD'`); the demo's event generator (*Performance test*) uses it to put no event on a day off. An event already on a day off can still be opened and saved as long as its dates do not change. Background events are not concerned, and neither are changes made through the API (`addEvent`, `updateEvent`, `setEvents`), nor the occurrences of a recurring event that fall on a day off. The stripes use `--ago-day-off-bg` and `--ago-day-off-stripe`.
+An event covers every day from its start to its end, so a Friday-to-Monday event touches the weekend. Code that adds events itself can ask `calendar.isDayOff(date)` (a `Date` or `'YYYY-MM-DD'`); the demo's event generator (*Performance test*) uses it to put no event on a day off. An event that already covers days off (set before them, or added through the API) keeps them: it can still be saved, moved or resized as long as it covers no other day off. Background events are not concerned, and neither are changes made through the API (`addEvent`, `updateEvent`, `setEvents`), nor the occurrences of a recurring event that fall on a day off. The stripes use `--ago-day-off-bg` and `--ago-day-off-stripe`.
 
 ## 🧩 Plugins
 
