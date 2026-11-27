@@ -117,21 +117,28 @@ function jsonStore(file) {
   };
 }
 
+// --reset deletes only the files of the storage actually used: the SQLite database and its side files
+// (an unclean stop leaves -wal / -shm / -journal, which SQLite would apply to the new file), or the
+// JSON fallback. A --db whose JSON fallback would be the demo's own events.json is refused.
 function openStore() {
-  // --reset: the database, SQLite's side files (an unclean stop leaves -wal / -shm / -journal, which
-  // SQLite would apply to the new file) and the JSON fallback.
-  if (args.includes('--reset')) {
-    for (const f of [DB_FILE, `${DB_FILE}-wal`, `${DB_FILE}-shm`, `${DB_FILE}-journal`, DB_FILE.replace(/\.db$/, '') + '.json']) fs.rmSync(f, { force: true });
+  const reset = args.includes('--reset'), jsonFile = DB_FILE.replace(/\.db$/, '') + '.json';
+  if (path.resolve(jsonFile) === path.join(ROOT, 'events.json')) {
+    console.error(`--db ${DB_FILE}: its JSON fallback would be the sample events file ${jsonFile}; choose another path`);
+    process.exit(1);
   }
+  let sqlite;
   try {
     // node:sqlite prints an "experimental" warning on load: drop that one only.
     const emit = process.emitWarning;
     process.emitWarning = (w, ...rest) => (/SQLite/.test(String(w?.message ?? w)) ? undefined : emit.call(process, w, ...rest));
-    return sqliteStore(DB_FILE);
+    require('node:sqlite');
+    sqlite = true;
   } catch (err) {
     if (err.code !== 'ERR_UNKNOWN_BUILTIN_MODULE' && !/sqlite/.test(err.message)) throw err;
-    return jsonStore(DB_FILE.replace(/\.db$/, '') + '.json');
+    sqlite = false;
   }
+  if (reset) for (const f of sqlite ? [DB_FILE, `${DB_FILE}-wal`, `${DB_FILE}-shm`, `${DB_FILE}-journal`] : [jsonFile]) fs.rmSync(f, { force: true });
+  return sqlite ? sqliteStore(DB_FILE) : jsonStore(jsonFile);
 }
 
 // --- Events: checked before they are stored ---
