@@ -237,6 +237,9 @@ function buildCalendar() {
   showStorageStatus();
 }
 
+// What each storage of the database API is called in the sidebar.
+const STORAGE_NAMES = { sqlite: 'SQLite database', json: 'JSON file', browser: 'browser database (IndexedDB, this browser only)' };
+
 // The restStorage plugin when "Database storage" is on.
 const storage = () => calendar.getPlugin('restStorage');
 
@@ -245,13 +248,13 @@ function showStorageStatus() {
   if (!settings.storage) document.getElementById('db-empty-status').textContent = '';
   const el = document.getElementById('storage-status');
   if (!storage()) {
-    el.innerHTML = 'Needs the Node.js server: <code>node server/server.js</code>';
+    el.innerHTML = 'Saves to <code>node server/server.js</code> when it serves the page, otherwise to this browser';
     return;
   }
   el.textContent = 'Connecting…';
   storage().health()
-    .then(h => { el.textContent = `Connected: ${h.storage === 'sqlite' ? 'SQLite database' : 'JSON file'} · ${num(h.events)} events stored`; })
-    .catch(() => { el.innerHTML = 'Server not reachable: start it with <code>node server/server.js</code> and open its address'; });
+    .then(h => { el.textContent = `Connected: ${STORAGE_NAMES[h.storage] ?? h.storage} · ${num(h.events)} events stored`; })
+    .catch(err => { el.textContent = `Database not reachable: ${err.message}`; });
 }
 
 // --- Database panel: the rows server/server.js has stored (GET /api/rows), last changed first ---
@@ -287,7 +290,7 @@ async function refreshDb() {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     res = await r.json();
   } catch {
-    status.innerHTML = 'Needs the Node.js server: <code>node server/server.js</code>, then open its address';
+    status.textContent = 'Could not read the database';
     list.replaceChildren();
     dbSnapshot = null;
     return;
@@ -319,7 +322,7 @@ async function refreshDb() {
   if (!res.rows.length) list.innerHTML = '<li class="db-empty">No rows stored</li>';
 
   const diff = [changed.size && `${changed.size} changed`, deleted && `${deleted} deleted`].filter(Boolean).join(', ');
-  status.textContent = `${res.storage === 'sqlite' ? 'SQLite' : 'JSON file'} · ${num(res.total)} rows` +
+  status.textContent = `${STORAGE_NAMES[res.storage] ?? res.storage} · ${num(res.total)} rows` +
     (res.total > res.rows.length ? ` (last ${res.rows.length} shown)` : '') +
     (diff ? ` · ${diff}` : '') + ` · ${new Date().toLocaleTimeString()}`;
 }

@@ -414,7 +414,7 @@ Override the `--ago-*` properties on `.agendo` (or on a `.ago-theme-<name>` clas
 
 ## 🖥️ Running the Demo
 
-The demo is online at **https://hohll.github.io/Agendo/**, published from `main` by GitHub Pages (`.github/workflows/pages.yml`). It runs there without the Node.js server, so *Database storage* is not available: run the demo locally for that.
+The demo is online at **https://hohll.github.io/Agendo/**, published from `main` by GitHub Pages (`.github/workflows/pages.yml`). It runs there without the Node.js server, so *Database storage* keeps the events in your browser instead (see below).
 
 Because [`index.html`](file:///index.html) fetches [`events.json`](file:///events.json) using the `fetch()` API, run a lightweight HTTP server in the repository root rather than opening via `file://`:
 
@@ -439,6 +439,8 @@ node server/server.js                    # http://localhost:8000, database serve
 node server/server.js --port 3000 --db /tmp/agenda.db
 node server/server.js --reset            # start again from the sample events
 ```
+
+Without the server (GitHub Pages, `python -m http.server`), `data/browser-api.js` answers the same API from IndexedDB, in your browser only: a new browser database gets the sample events, and the sidebar says *browser database*. The page uses the server whenever `api/health` answers.
 
 Open its address, then *Customize → Plugins → Database storage*: the calendar now loads its events from the database (the status line shows the storage and the number of events) and saves every change, recurring ones included. Reload the page: everything comes back.
 

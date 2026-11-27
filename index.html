@@ -166,7 +166,7 @@
             <pre><code id="data-model-code"></code></pre>
           </details>
           <label class="switch"><input type="checkbox" name="storage"><span>Database storage (restStorage)</span></label>
-          <small class="plugin-sub storage-status" id="storage-status" aria-live="polite">Needs the Node.js server: <code>node server/server.js</code></small>
+          <small class="plugin-sub storage-status" id="storage-status" aria-live="polite">Saves to <code>node server/server.js</code> when it serves the page, otherwise to this browser</small>
         </fieldset>
 
         <!-- Shown only when Plugins → Database storage is on -->
@@ -316,6 +316,8 @@
 
   <!-- Test data generator (performance test) -->
   <script src="data/generate-events.js"></script>
+  <!-- Without the Node.js server (GitHub Pages…), the demo's database API runs in the browser -->
+  <script src="data/browser-api.js"></script>
 
   <!-- Demo Application Script (fetches events.json) -->
   <script src="demo.js"></script>
