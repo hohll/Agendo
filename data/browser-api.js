@@ -21,7 +21,10 @@
     { status, headers: body === undefined ? {} : { 'Content-Type': 'application/json; charset=utf-8' } });
   const fail = (status, error) => Object.assign(new Error(error), { status });
 
-  // The Node.js server answers api/health with JSON; a static host answers 404 (or an HTML page).
+  // The Node.js server answers api/health with JSON: 'server' for good. A static host answers 404 / 405
+  // or an HTML page: 'browser' for good. Anything else (403, 5xx, the server restarting, no network)
+  // decides nothing: the request goes to the server and fails visibly, and the next one asks again,
+  // so a server that is briefly unavailable never sends the session's writes to the browser.
   function detect() {
     if (mode) return Promise.resolve(mode);
     return (probing ??= realFetch(API + 'health', { headers: { Accept: 'application/json' } })
@@ -36,18 +39,33 @@
 
   // --- IndexedDB: one store of rows { id, start_ms, end_ms, recurring, data, updated_at } ---
 
+  // Store 'meta' holds 'seeded' = true once the sample events are in, written in the same transaction
+  // as them: a seed that failed (events.json not loaded, tab closed) is done again on the next open,
+  // two tabs seeding at once write the same rows, and an emptied database stays empty.
   let dbPromise = null;
   function db() {
     return (dbPromise ??= new Promise((resolve, reject) => {
-      const req = indexedDB.open('agendo-demo', 1);
-      let fresh = false;
-      req.onupgradeneeded = () => { req.result.createObjectStore('events', { keyPath: 'id' }); fresh = true; };
-      req.onsuccess = () => resolve(fresh ? seed(req.result).then(() => req.result) : req.result);
+      const req = indexedDB.open('agendo-demo', 2);
+      req.onupgradeneeded = e => {
+        const d = req.result;
+        if (!d.objectStoreNames.contains('events')) d.createObjectStore('events', { keyPath: 'id' });
+        if (!d.objectStoreNames.contains('meta')) {
+          d.createObjectStore('meta');
+          // A version-1 database was seeded when it was created: keep its events as they are.
+          if (e.oldVersion >= 1) req.transaction.objectStore('meta').put(true, 'seeded');
+        }
+      };
+      req.onsuccess = () => {
+        const d = req.result;
+        d.onversionchange = () => d.close();   // let a newer page upgrade it
+        resolve(run(d, 'meta', 'readonly', s => s.get('seeded')).then(done => (done ? d : seed(d).then(() => d))));
+      };
       req.onerror = () => reject(req.error);
-    }));
+    }).catch(err => { dbPromise = null; throw err; }));   // e.g. blocked or unavailable: try again next time
   }
-  const run = (store, mode, fn) => new Promise((resolve, reject) => {
-    const tx = store.transaction('events', mode), out = fn(tx.objectStore('events'));
+  const run = (d, stores, mode, fn) => new Promise((resolve, reject) => {
+    const tx = d.transaction(stores, mode);
+    const out = fn(...[].concat(stores).map(n => tx.objectStore(n)));
     tx.oncomplete = () => resolve(out instanceof IDBRequest ? out.result : out);
     tx.onerror = tx.onabort = () => reject(tx.error);
   });
@@ -85,19 +103,19 @@
       return allDay ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` : d.toISOString();
     };
     const events = data.map(e => clean({ ...e, start: shift(e.start, e.allDay), end: shift(e.end, e.allDay) }));
-    await run(database, 'readwrite', s => { for (const ev of events) s.put(row(ev)); });
+    await run(database, ['events', 'meta'], 'readwrite', (s, meta) => { for (const ev of events) s.put(row(ev)); meta.put(true, 'seeded'); });
   }
 
   // --- The API ---
 
   async function handle(method, url, body) {
     const database = await db();
-    const all = () => run(database, 'readonly', s => s.getAll());
+    const all = () => run(database, 'events', 'readonly', s => s.getAll());
     const path = url.pathname.slice(API.length);   // 'health', 'rows', 'events', 'events/<id>'
     const m = /^events(?:\/([^/]+))?\/?$/.exec(path), id = m?.[1] && decodeURIComponent(m[1]);
 
     if (path === 'health' && method === 'GET') {
-      return json(200, { ok: true, storage: 'browser', events: await run(database, 'readonly', s => s.count()) });
+      return json(200, { ok: true, storage: 'browser', events: await run(database, 'events', 'readonly', s => s.count()) });
     }
     if (path === 'rows' && method === 'GET') {
       const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 100));
@@ -119,24 +137,24 @@
         return json(200, rows.map(r => r.data));
       }
       case 'GET item': {
-        const r = await run(database, 'readonly', s => s.get(id));
+        const r = await run(database, 'events', 'readonly', s => s.get(id));
         return r ? json(200, r.data) : json(404, { error: 'No such event' });
       }
       case 'POST list':
       case 'PUT item': {
         const ev = clean(typeof body === 'string' ? JSON.parse(body || 'null') : body, id);
-        await run(database, 'readwrite', s => s.put(row(ev)));
+        await run(database, 'events', 'readwrite', s => s.put(row(ev)));
         return json(id ? 200 : 201, ev);
       }
       case 'DELETE item': {
-        const had = await run(database, 'readonly', s => s.count(id));
+        const had = await run(database, 'events', 'readonly', s => s.count(id));
         if (!had) return json(404, { error: 'No such event' });
-        await run(database, 'readwrite', s => s.delete(id));
+        await run(database, 'events', 'readwrite', s => s.delete(id));
         return json(204);
       }
       case 'DELETE list': {
-        const n = await run(database, 'readonly', s => s.count());
-        await run(database, 'readwrite', s => s.clear());
+        const n = await run(database, 'events', 'readonly', s => s.count());
+        await run(database, 'events', 'readwrite', s => s.clear());
         return json(200, { deleted: n });
       }
       default:
