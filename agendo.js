@@ -85,6 +85,7 @@ class Agendo {
     monthMaxEvents: 3,      // events listed per day cell in month view before "+N more"
     timelineCustom: null,   // { days: 3, slotMinutes: 30, labelMinutes: 60, slotWidth: 24, label: '3 days' }
                             // enables 'timeline-custom'
+    dialogExpand: false,    // true: the event form widens to two columns when its fields are taller than the window
     eventPopover: true,     // card with the event's details on mouse hover; false = none,
                             // or (event) => Node | string | null for your own content
     resourceLabel: 'Resources',  // header of the resource column in timeline views
@@ -226,6 +227,7 @@ class Agendo {
       <dialog class="ago-dialog">
         <form method="dialog">
           <header><span class="ago-dialog-title"></span><button value="cancel" formnovalidate>&times;</button></header>
+          <div class="ago-dialog-body">
           <label data-field="title">Title <input name="title" required></label>
           <label class="ago-check" data-field="allDay"><input type="checkbox" name="allDay"> All day</label>
           <label data-field="start">Start <input name="start" type="datetime-local" required></label>
@@ -261,6 +263,7 @@ class Agendo {
           <label data-res-field data-field="resource">Resource <select name="resourceId"></select></label>
           <label data-cal-field data-field="calendar">Calendar <select name="calendarId"></select></label>
           <label data-cat-field data-field="category">Category <select name="categoryId"></select></label>
+          </div>
           <footer>
             <button class="ago-btn ago-btn-danger" value="delete" formnovalidate>Delete</button>
             <button class="ago-btn" value="cancel" formnovalidate>Cancel</button>
@@ -289,6 +292,7 @@ class Agendo {
     this.grid = $('.ago-grid');
     this.dialog = $('dialog');
     this.form = $('form');
+    this.dialogBody = $('.ago-dialog-body');   // the fields, between header and footer: only this part scrolls
     this.scopeDialog = $('.ago-scope');
     this._bindPopover();
 
@@ -319,6 +323,9 @@ class Agendo {
     // Dropdowns: only one open at a time; close on outside click or Escape.
     const menus = [...this.el.querySelectorAll('.ago-dropdown')];
     menus.forEach(m => m.addEventListener('toggle', () => m.open && menus.forEach(o => o !== m && (o.open = false))));
+    this._onWinResize = () => this._fitDialog();
+    window.addEventListener('resize', this._onWinResize);
+    this.form.addEventListener('change', () => this._fitDialog());   // e.g. Repeat → Custom shows more fields
     this._onDocPointer = e => { if (!e.target.closest?.('.ago-dropdown')) this._closeMenus(); };
     document.addEventListener('pointerdown', this._onDocPointer);
     $('.ago-toolbar').addEventListener('keydown', e => {
@@ -1601,7 +1608,20 @@ class Agendo {
     this._fillRule(event?.recurrence, start);
     this._applyFormModel(event);
     this._checkRange();
+    this.dialogBody.scrollTop = 0;
     this.dialog.showModal();
+    this._fitDialog();
+  }
+
+  // dialogExpand: two columns when the fields are taller than the window (and the window is wide enough).
+  // Checked when the dialog opens, when the window is resized and after any change in the form.
+  _fitDialog() {
+    const d = this.dialog, body = this.dialogBody;
+    if (!d.open) return;
+    const top = body.scrollTop;
+    d.classList.remove('ago-dialog-wide');
+    if (this.o.dialogExpand && window.innerWidth >= 640 && body.scrollHeight > body.clientHeight + 1) d.classList.add('ago-dialog-wide');
+    body.scrollTop = top;
   }
 
   // --- Event form: fields from a model that plugins can change (formFields hook) ---
@@ -1618,7 +1638,7 @@ class Agendo {
       resource: this.resources.length > 0 && this._isResourceView(),
       calendar: this.calendars.length > 0, category: this.categories.length > 0
     };
-    const wanted = new Set(fields.map(f => f.name)), footer = this.form.querySelector('footer');
+    const wanted = new Set(fields.map(f => f.name));
     for (const el of this.form.querySelectorAll('[data-field]')) {
       const name = el.dataset.field;
       el.hidden = !wanted.has(name) || (name in can && !can[name]);
@@ -1636,7 +1656,7 @@ class Agendo {
         this._customDefs.push(def);
         this._fillCustomField(def, el, event);
       }
-      footer.before(el);   // model order
+      this.dialogBody.append(el);   // model order
     }
   }
 
@@ -2302,6 +2322,7 @@ class Agendo {
     clearInterval(this.timer);
     this._hidePopover();
     document.removeEventListener('pointerdown', this._onDocPointer);
+    window.removeEventListener('resize', this._onWinResize);
     this.el.replaceChildren();
     this.el.classList.remove('agendo');
     this.setTheme(null);

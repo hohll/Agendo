@@ -420,8 +420,23 @@
 }
 .ago-dialog::backdrop { background: rgb(15 23 42 / 0.45); }
 
-.ago-dialog { max-height: calc(100vh - 32px); }
-.ago-dialog form { display: flex; flex-direction: column; gap: 14px; }
+.ago-dialog { max-height: calc(100dvh - 32px); overflow: hidden; }
+/* Header and footer stay; only the fields between them scroll */
+.ago-dialog form { display: flex; flex-direction: column; max-height: calc(100dvh - 32px); }
+.ago-dialog header,
+.ago-dialog footer { flex: none; }
+.ago-dialog-body,
+.ago-scope-list { display: flex; flex-direction: column; gap: 14px; padding: 14px 0; }
+.ago-dialog-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+/* dialogExpand: a wider dialog, fields in two columns (title, all day, repeat and text areas span both) */
+.ago-dialog.ago-dialog-wide { width: min(94vw, 840px); }
+.ago-dialog-wide .ago-dialog-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; }
+.ago-dialog-wide .ago-dialog-body > [data-field="title"],
+.ago-dialog-wide .ago-dialog-body > [data-field="allDay"],
+.ago-dialog-wide .ago-dialog-body > .ago-repeat,
+.ago-dialog-wide .ago-dialog-body > label:has(textarea) { grid-column: 1 / -1; }
+.ago-dialog-wide .ago-dialog-body > .ago-check { align-self: center; }
 
 /* Checkbox and radio rows, repeat options, scope choice */
 .ago-dialog label.ago-check {
@@ -473,7 +488,7 @@
 .ago-weekdays input:checked + span { color: var(--ago-on-primary); background: var(--ago-primary); border-color: var(--ago-primary); }
 .ago-weekdays input:focus-visible + span { box-shadow: 0 0 0 3px var(--ago-focus-ring); }
 .ago-scope { width: min(90vw, 340px); }
-.ago-scope-list { display: flex; flex-direction: column; gap: 12px; }
+.ago-scope-list { gap: 12px; }
 .ago-dialog header,
 .ago-dialog footer { display: flex; align-items: center; gap: 8px; padding: 14px 20px; }
 .ago-dialog header {

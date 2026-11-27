@@ -97,6 +97,7 @@ const DEFAULTS = {
   daysOffDates: '',        // 'YYYY-MM-DD' dates, separated by commas or spaces
   openEventOn: 'click',
   eventPopover: true,
+  dialogExpand: true,
   enableAllDay: true,
   enableRecurring: true,
   // Plugins
@@ -185,6 +186,7 @@ function toOptions(s) {
     daysOff: daysOffOf(s),
     openEventOn: s.openEventOn,
     eventPopover: s.eventPopover,
+    dialogExpand: s.dialogExpand,
     enableAllDay: s.enableAllDay,
     enableRecurring: s.enableRecurring,
     plugins: pluginsOf(s)
@@ -453,6 +455,7 @@ function readForm() {
     daysOffDates: offDates(f.daysOffDates.value).join(', '),
     openEventOn: f.openEventOn.value,
     eventPopover: f.eventPopover.checked,
+    dialogExpand: f.dialogExpand.checked,
     enableAllDay: f.enableAllDay.checked,
     enableRecurring: f.enableRecurring.checked,
     holidays: f.holidays.value,
