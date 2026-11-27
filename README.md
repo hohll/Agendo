@@ -463,7 +463,7 @@ The database file can also be opened with any SQLite tool (`sqlite3 server/agend
 | `PUT /api/events/:id` | Replace an event → `200` |
 | `DELETE /api/events/:id` | Delete an event → `204` |
 | `DELETE /api/events` | Delete every event → `{ deleted }` |
-| `GET /api/rows?limit=N` | The stored rows as they are (`id`, `start_ms`, `end_ms`, `recurring`, `data`, `updated_at`), last changed first: `{ storage, total, rows }` (`limit` 1–500, default 100) |
+| `GET /api/rows?limit=N` | The stored rows as they are (`id`, `start_ms`, `end_ms`, `recurring`, `data`, `updated_at`), last changed first: `{ storage, total, rows, truncated }` (`limit` 1–500, default 100; about 5 MB at most, `truncated: true` when rows were left out) |
 
 Each event is stored whole (custom fields included) with its time span indexed for range queries; dates are ISO instants, all-day ones `YYYY-MM-DD`. A new database gets the sample events of `events.json`, moved to the current week (`--no-seed` to start empty). The server listens on `127.0.0.1` only, serves the demo's files (never `server/` or dot files) and checks what it stores. Its API answers the demo page only: writes need a JSON body and are refused from another origin, and a request for a host name other than `localhost`, an IP address or a name given with `--allow-host` is refused (DNS rebinding), whatever `--host` is. It is a demo, without authentication. The database files are ignored by git.
 

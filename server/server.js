@@ -18,7 +18,7 @@
  *   PUT    /api/events/:id                  replace an event → 200 + the event
  *   DELETE /api/events/:id                  → 204
  *   DELETE /api/events                      delete every event → 200 + { deleted }
- *   GET    /api/rows?limit=N                { storage, total, rows }: the stored rows, last changed
+ *   GET    /api/rows?limit=N                { storage, total, rows, truncated }: the stored rows, last changed
  *                                           first (for the demo's Database panel; limit 1–500, 100)
  * An event is stored whole (custom fields included) with its time span indexed for range queries.
  * Dates: ISO instants ('2026-11-20T08:00:00.000Z'), all-day events as 'YYYY-MM-DD'.
@@ -93,8 +93,15 @@ function sqliteStore(file) {
 }
 
 function jsonStore(file) {
-  let events = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : [];
-  const save = () => fs.writeFileSync(file, JSON.stringify(events, null, 1));
+  let events = [];
+  if (fs.existsSync(file)) {
+    try { events = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (err) {
+      console.error(`${file} cannot be read (${err.message}): fix it or start with --reset`);
+      process.exit(1);
+    }
+  }
+  // Written to a temporary file, then renamed over the old one: a crash mid-write leaves the old file whole.
+  const save = () => { fs.writeFileSync(`${file}.tmp`, JSON.stringify(events, null, 1)); fs.renameSync(`${file}.tmp`, file); };
   return {
     kind: 'json',
     file,
@@ -255,7 +262,15 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/health') return send(res, 200, { ok: true, storage: store.kind, events: store.count() });
     if (url.pathname === '/api/rows' && req.method === 'GET') {
       const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 100));
-      return send(res, 200, { storage: store.kind, total: store.count(), rows: store.rows(limit) });
+      // At most about 5 MB of rows (an event can be up to 1 MB): truncated tells the page there are more.
+      const rows = [];
+      let size = 0, truncated = false;
+      for (const row of store.rows(limit)) {
+        size += JSON.stringify(row).length;
+        if (size > 5e6 && rows.length) { truncated = true; break; }
+        rows.push(row);
+      }
+      return send(res, 200, { storage: store.kind, total: store.count(), rows, truncated });
     }
     if (!match) {
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'Method not allowed' });
