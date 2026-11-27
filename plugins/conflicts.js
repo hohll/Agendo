@@ -7,7 +7,8 @@
  *   by      'resource' (default): events overlap only on the same resource; 'all': any two events
  *   block   true (default): saving or dropping an event onto another is refused with a message;
  *           false: allowed, only shown
- *   ignore  (event) => true for events that never conflict (default: background events)
+ *   ignore  (event) => true for other events that never conflict; background events and the
+ *           holidays plugin's events (holiday: true) never do
  *
  * Overlapping events get the class ago-conflict (a red outline and a ⚠ badge). Recurring events
  * count through their occurrences. Hooks: validate, beforeRenderEvents, eventContent.
@@ -19,7 +20,7 @@
 .ago-list-item.ago-conflict { outline-offset: -3px; }`;
 
   function conflicts({ by = 'resource', block = true, ignore = null } = {}) {
-    const skip = ev => ev.display === 'background' || ev.display === 'inverse-background' || (ignore && ignore(ev));
+    const skip = ev => ev.display === 'background' || ev.display === 'inverse-background' || ev.holiday || (ignore && ignore(ev));
     const group = ev => (by === 'resource' ? ev.resourceId : 'all');
     let calendar, clashing = new Map();   // id → titles it overlaps
 
@@ -72,9 +73,11 @@
 
       validate(data, { event }) {
         if (!block || skip(data) || group(data) == null) return null;
-        const self = event?.id;
+        // The event itself, and the other occurrences of its series (they may move with it), do not count.
+        const self = event?.id, series = event?.recurringId ?? (event?.recurrence ? event.id : null);
         const other = calendar.getOccurrences(data.start, data.end).find(x =>
-          x.id !== self && !skip(x) && group(x) === group(data) && x.start < data.end && x.end > data.start);
+          x.id !== self && !(series && x.recurringId === series) && !skip(x) && group(x) === group(data) &&
+          x.start < data.end && x.end > data.start);
         if (!other) return null;
         const t = d => d.toLocaleTimeString(calendar.o.locale, { hour: 'numeric', minute: '2-digit' });
         const res = by === 'resource' ? calendar.getResources().find(r => r.id === data.resourceId)?.title : null;
