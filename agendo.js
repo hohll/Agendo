@@ -1676,17 +1676,30 @@ class Agendo {
     f.title.value = event?.title ?? '';
     f.allDay.checked = event?.allDay ?? allDay;
     this._setDateInputs(f.allDay.checked, start, end);
-    f.resourceId.value = event?.resourceId ?? resourceId ?? '';
+    this._selectKeeping(f.resourceId, event?.resourceId ?? resourceId);
     // A new event goes to the first calendar still shown, so it does not vanish on save.
-    f.calendarId.value = event?.calendarId
-      ?? this.calendars.find(c => !this.hidden.calendar.has(c.id))?.id ?? '';
-    f.categoryId.value = event?.categoryId ?? '';
+    this._selectKeeping(f.calendarId, event?.calendarId ?? this.calendars.find(c => !this.hidden.calendar.has(c.id))?.id);
+    this._selectKeeping(f.categoryId, event?.categoryId);
     this._fillRule(event?.recurrence, start);
     this._applyFormModel(event);
     this._checkRange();
     this.dialogBody.scrollTop = 0;
     this.dialog.showModal();
     this._fitDialog();
+  }
+
+  // Selects `value` in a resource, calendar or category field. An id no longer in the list (a resource
+  // removed with setResources…) gets a hidden option of its own, so saving the event keeps it.
+  _selectKeeping(select, value) {
+    select.querySelector('option[data-kept]')?.remove();
+    value = value == null ? '' : String(value);
+    if (value && ![...select.options].some(o => o.value === value)) {
+      const opt = new Option(value, value);
+      opt.hidden = true;
+      opt.dataset.kept = '';
+      select.append(opt);
+    }
+    select.value = value;
   }
 
   // dialogExpand: two columns when the fields are taller than the window (and the window is wide enough).
