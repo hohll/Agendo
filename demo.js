@@ -93,6 +93,8 @@ const DEFAULTS = {
   enableMove: true,
   enableResize: true,
   editPastEvents: true,
+  daysOff: [],             // weekdays as strings ('0' = Sunday … '6' = Saturday)
+  daysOffDates: '',        // 'YYYY-MM-DD' dates, separated by commas or spaces
   openEventOn: 'click',
   eventPopover: true,
   enableAllDay: true,
@@ -142,6 +144,17 @@ function pluginsOf(s) {
   ].filter(Boolean).map(([plugin, code]) => Object.assign(plugin, { code }));
 }
 
+// The dates typed in "Other dates" that read as YYYY-MM-DD, sorted, each once.
+const offDates = text => [...new Set(text.split(/[\s,;]+/).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x) && !isNaN(Date.parse(x))))].sort();
+
+// The daysOff option from the Days off section: Saturday and Sunday together read as 'weekend'.
+function daysOffOf(s) {
+  const weekdays = s.daysOff.map(Number).sort((a, b) => a - b);
+  const weekend = weekdays.includes(0) && weekdays.includes(6);
+  const list = [...(weekend ? ['weekend'] : []), ...weekdays.filter(d => !weekend || (d !== 0 && d !== 6)), ...offDates(s.daysOffDates)];
+  return !list.length ? null : list.length === 1 && weekend ? 'weekend' : list;
+}
+
 // Calendar options from the settings.
 function toOptions(s) {
   return {
@@ -169,6 +182,7 @@ function toOptions(s) {
     enableMove: s.enableMove,
     enableResize: s.enableResize,
     editPastEvents: s.editPastEvents,
+    daysOff: daysOffOf(s),
     openEventOn: s.openEventOn,
     eventPopover: s.eventPopover,
     enableAllDay: s.enableAllDay,
@@ -432,6 +446,8 @@ function readForm() {
     enableMove: f.enableMove.checked,
     enableResize: f.enableResize.checked,
     editPastEvents: f.editPastEvents.checked,
+    daysOff: [...form.querySelectorAll('[name="daysOff"]:checked')].map(b => b.value),
+    daysOffDates: offDates(f.daysOffDates.value).join(', '),
     openEventOn: f.openEventOn.value,
     eventPopover: f.eventPopover.checked,
     enableAllDay: f.enableAllDay.checked,
@@ -457,7 +473,16 @@ function syncEditing() {
   for (const n of ['enableCreate', 'enableMove', 'enableResize', 'editPastEvents', 'enableAllDay', 'enableRecurring']) f[n].disabled = ro;
   for (const r of form.querySelectorAll('[name="holidaysDisplay"]')) r.disabled = !f.holidays.value;
   f.conflictsBlock.disabled = !f.conflicts.checked;
+  const sat = form.querySelector('[name="daysOff"][value="6"]'), sun = form.querySelector('[name="daysOff"][value="0"]');
+  document.getElementById('days-off-weekend').setAttribute('aria-pressed', sat.checked && sun.checked);
 }
+
+// "Week end": Saturday and Sunday on together, or off together when both were on.
+document.getElementById('days-off-weekend').addEventListener('click', () => {
+  const sat = form.querySelector('[name="daysOff"][value="6"]'), sun = form.querySelector('[name="daysOff"][value="0"]');
+  sat.checked = sun.checked = !(sat.checked && sun.checked);
+  sat.dispatchEvent(new Event('change', { bubbles: true }));
+});
 
 form.addEventListener('input', e => {
   if (e.target.name === 'slotHeight') form.elements.slotHeightOut.value = `${e.target.value}px`;
@@ -734,7 +759,7 @@ async function loadTest() {
   perfResults.textContent = `Generating ${num(n)} events…`;
   await nextPaint();
   const t0 = performance.now();
-  let events = generateEvents(n, { days });
+  let events = generateEvents(n, { days, isDayOff: d => calendar.isDayOff(d) });   // none on the days off
   rows.push([`Generate ${num(n)} events`, ms(performance.now() - t0)]);
   const t2 = performance.now();
   calendar.setEvents(events);

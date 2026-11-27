@@ -75,6 +75,9 @@ class Agendo {
     enableMove: true,
     enableResize: true,
     editPastEvents: true,   // false: events that have ended cannot be moved, resized or opened in the form
+    daysOff: null,          // days where no event can be added, created, moved or resized onto: 'weekend'
+                            // (Saturday and Sunday), weekdays (0 = Sunday … 6 = Saturday), 'YYYY-MM-DD' dates,
+                            // in an array (['weekend', '2026-12-25']), or (date) => boolean
     enableAllDay: true,     // "All day" in the event form, and drag to create in the all-day row
     enableRecurring: true,  // "Repeat" in the event form (existing recurring events still show)
     showCurrentTime: true,
@@ -433,7 +436,7 @@ class Agendo {
     const now = new Date();
     const sep = i => (grouped && n > 1 && i > 0 && i % R === 0 ? ' ago-date-start' : '');
     const dayHead = (d, i) => `
-      <div class="ago-day-head${sameDay(d, now) ? ' ago-today' : ''}${sep(i * R)}" style="grid-column: span ${R}">
+      <div class="ago-day-head${sameDay(d, now) ? ' ago-today' : ''}${this._isDayOff(d) ? ' ago-day-off' : ''}${sep(i * R)}" style="grid-column: span ${R}">
         <div class="ago-day-name">${this.fmt.weekday.format(d)}</div>
         <div class="ago-day-num">${d.getDate()}</div>
       </div>`;
@@ -456,7 +459,7 @@ class Agendo {
     this.grid.innerHTML =
       `<div class="ago-head">${head}</div>` +
       this.gutterHtml +
-      this.dates.map((_, i) => `<div class="ago-col${sep(i)}" data-day="${i}"><div class="ago-layer"></div></div>`).join('');
+      this.dates.map((d, i) => `<div class="ago-col${sep(i)}${this._isDayOff(d) ? ' ago-day-off' : ''}" data-day="${i}"><div class="ago-layer"></div></div>`).join('');
 
     this.cols = [...this.grid.querySelectorAll('.ago-col')];
     this.adRow = this.grid.querySelector('.ago-allday');
@@ -504,7 +507,7 @@ class Agendo {
       : t.days === 1 ? this.fmt.range.format(t.first)
       : this.fmt.range.formatRange(t.first, days.at(-1));
 
-    const today = d => (sameDay(d, now) ? ' ago-today' : '');
+    const today = d => (sameDay(d, now) ? ' ago-today' : '') + (this._isDayOff(d) ? ' ago-day-off' : '');
     const slotFmt = t.labelMinutes % 60 ? this.fmt.time : this.fmt.hour;
     // Week number at the first day and at each week start.
     const wk = (d, i) => (this.o.weekNumbers && (i === 0 || d.getDay() === this.o.firstDayOfWeek) ? this._weekLabel(d) : '');
@@ -576,6 +579,9 @@ class Agendo {
     // Today's column is tinted in every row.
     const k = Math.round((atMinutes(new Date(), 0) - t.first) / 864e5);
     const band = k >= 0 && k < t.days && [k / t.days, (k + 1) / t.days];
+    // Days off are shaded in every row.
+    const offBands = [];
+    for (let j = 0; j < t.days; j++) if (this._isDayOff(addDays(t.first, j))) offBands.push([j / t.days, (j + 1) / t.days]);
 
     this.rows.forEach((row, i) => {
       const r = this.resources[i];
@@ -629,6 +635,11 @@ class Agendo {
       if (band) {
         const b = div('ago-tl-today');
         box(b, ...band);
+        els.unshift(b);
+      }
+      for (const off of offBands) {
+        const b = div('ago-tl-off');
+        box(b, ...off);
         els.unshift(b);
       }
       if (preview && preview.resourceId === r.id) {
@@ -814,7 +825,7 @@ class Agendo {
           const btn = `<button type="button" class="ago-ywk" data-week="${i}" title="Week ${n}" aria-label="Week ${n}">${n}</button>`;
           cells = d === 1 ? btn + cells : cells + btn;
         }
-        cells += `<button type="button" class="ago-yday${sameDay(date, now) ? ' ago-today' : ''}" data-goto="${i}">` +
+        cells += `<button type="button" class="ago-yday${sameDay(date, now) ? ' ago-today' : ''}${this._isDayOff(date) ? ' ago-day-off' : ''}" data-goto="${i}">` +
           `<span class="ago-yday-num">${d}</span><span class="ago-ydots"></span></button>`;
       }
       html += `<section class="ago-ymonth">
@@ -980,7 +991,7 @@ class Agendo {
       (wn ? '<div class="ago-month-head ago-col0 ago-wk-head"></div>' : '') +
       this.dates.slice(0, 7).map((d, i) => `<div class="ago-month-head${!wn && !i ? ' ago-col0' : ''}">${this.fmt.weekday.format(d)}</div>`).join('') +
       this.dates.map((d, i) => `${wkCell(i)}
-        <div class="ago-cell${!wn && i % 7 === 0 ? ' ago-col0' : ''}${d.getMonth() !== first.getMonth() ? ' ago-other' : ''}${sameDay(d, now) ? ' ago-today' : ''}" data-day="${i}">
+        <div class="ago-cell${!wn && i % 7 === 0 ? ' ago-col0' : ''}${d.getMonth() !== first.getMonth() ? ' ago-other' : ''}${sameDay(d, now) ? ' ago-today' : ''}${this._isDayOff(d) ? ' ago-day-off' : ''}" data-day="${i}">
           <div class="ago-cell-bg"></div>
           <button type="button" class="ago-cell-num" data-goto="${i}">${d.getDate()}</button>
           <div class="ago-cell-events"></div>
@@ -1705,6 +1716,8 @@ class Agendo {
   // ctx.action: 'save' (event form), 'move' or 'resize' (drag and drop).
   _errors(data, event, action) {
     const errors = {};
+    const off = this._dayOffChange(data, event);
+    if (off) errors.start = this._dayOffMessage(off);
     for (const p of this._hooks.validate ?? []) Object.assign(errors, p.validate(data, { event: event ?? null, calendar: this, action }) || {});
     for (const k of Object.keys(errors)) if (!errors[k]) delete errors[k];
     return errors;
@@ -1712,13 +1725,62 @@ class Agendo {
 
   // A drag and drop: refused (with a message) when a validate hook objects.
   _dropAllowed(data, action, event = data) {
-    if (!this._hooks.validate) return true;
+    if (!this._hooks.validate && !this.o.daysOff) return true;
     const errors = this._errors({ ...data }, event, action), first = Object.values(errors)[0];
     if (first) this.notify(first);
     return !first;
   }
 
-  openCreateModal(start, end, resourceId, allDay = false) { this._openDialog('New Event', null, start, end, resourceId, allDay); }
+  openCreateModal(start, end, resourceId, allDay = false) {
+    const off = this._dayOffIn(start, end);
+    if (off) return this.notify(this._dayOffMessage(off));
+    this._openDialog('New Event', null, start, end, resourceId, allDay);
+  }
+
+  // --- Days off (daysOff option): no event can be added there ---
+
+  // Whether `date` is a day off. The option is read into a test once, then again when it changes.
+  _isDayOff(date) {
+    const src = this.o.daysOff;
+    if (!src) return false;
+    if (this._offSrc !== src) {
+      this._offSrc = src;
+      if (typeof src === 'function') this._offTest = src;
+      else {
+        const weekdays = new Set(), dates = new Set();
+        for (const x of [].concat(src)) {
+          if (x === 'weekend') { weekdays.add(0); weekdays.add(6); }
+          else if (typeof x === 'number') weekdays.add(x);
+          else dates.add(String(x));
+        }
+        this._offTest = d => weekdays.has(d.getDay()) || dates.has(dayKey(d));
+      }
+    }
+    return !!this._offTest(date);
+  }
+
+  // The first day off that [start, end) touches, or null.
+  _dayOffIn(start, end) {
+    if (!this.o.daysOff || !start) return null;
+    start = toDate(start);
+    end = end ? toDate(end) : start;
+    const last = end > start ? new Date(end - 1) : start;
+    for (let d = atMinutes(start, 0), n = 0; d <= last && n < 366; d = addDays(d, 1), n++) if (this._isDayOff(d)) return d;
+    return null;
+  }
+
+  // The day off a change would put the event on, or null. Background events are not concerned, and an
+  // event whose dates do not change can still be saved (it was there before the days off were set).
+  _dayOffChange(data, event) {
+    if (!this.o.daysOff || isBg(data) || (event && isBg(event))) return null;
+    if (event && +toDate(event.start) === +toDate(data.start) && +toDate(event.end) === +toDate(data.end)) return null;
+    return this._dayOffIn(data.start, data.end);
+  }
+
+  // Whether `date` is a day off (daysOff option), for code that adds events itself.
+  isDayOff(date) { return this._isDayOff(toDate(date)); }
+
+  _dayOffMessage(d) { return `${this.fmt.dayLong.format(d)} is a day off`; }
   openEditModal(event) { this._openDialog('Edit Event', event, event.start, event.end); }
 
   // All-day events show their dates, the end date included (stored exclusive, as in iCalendar).

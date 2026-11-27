@@ -33,6 +33,7 @@ That project is itself inspired by and based on the classic [jquery-week-calenda
 - **Recurring Events**: daily, weekly (chosen weekdays), monthly (same day, or "2nd Tuesday" / "last Friday"), yearly, every N, until a date or N times, with skipped dates. Rules are a subset of iCalendar RRULE. Editing, dragging or deleting an occurrence asks *This event / This and following events / All events*, like Google Calendar.
 - **Background Events**: `display: 'background'` shades a period behind the events (lunch break, maintenance, holiday) without blocking clicks; `'inverse-background'` shades everything outside it (opening hours). Like FullCalendar's background events.
 - **Past Events Locked** (optional): `editPastEvents: false` keeps events that have ended from being moved, resized or opened in the form.
+- **Days off**: `daysOff: 'weekend'` (or weekdays, dates, a function) stripes those days, and no event can be created on them, moved or resized onto them, or saved over them.
 - **Plugins**: hooks to change how events are loaded, which fields the event form has, how events look and what the popover shows. The `eventDataModel` plugin (`plugins/event-data-model.js`) defines the information an event holds as a list of fields.
 - **Event Popover**: hovering an event shows a card with all its details; short events fit their title and time on one line.
 - **Smart Overlap Handling**: Automatically detects overlapping event clusters and arranges them side-by-side cleanly.
@@ -121,6 +122,7 @@ const calendar = new Agendo('#calendar-container', {
 | `enableCreate` | `boolean` | `true` | Allow drag-to-create on empty slots. |
 | `enableMove` | `boolean` | `true` | Allow dragging events to move them. |
 | `enableResize` | `boolean` | `true` | Allow dragging handles to resize events. |
+| `daysOff` | `string \| Array \| Function \| null` | `null` | Days where no event can be added: `'weekend'` (Saturday and Sunday), weekday numbers (`0` = Sunday … `6` = Saturday), `'YYYY-MM-DD'` dates, mixed in an array (`['weekend', '2026-12-25']`), or `(date) => boolean`. See [Days off](#days-off). |
 | `editPastEvents` | `boolean` | `true` | `false`: an event that has ended (its end is before now) cannot be moved, resized or opened in the form, like an event with `editable: false`; `onEventClick` still gets it. Each occurrence of a recurring event is judged on its own. |
 | `showCurrentTime` | `boolean` | `true` | Display the real-time indicator line. |
 | `timelineCustom` | `object \| null` | `null` | Enables the `'timeline-custom'` view: `{ days: 3, slotMinutes: 30, labelMinutes: 60, slotWidth: 24, label: '3 days' }` (slot size, time-label interval, slot width in px). Use `slotMinutes: 1440` for one slot per day. |
@@ -213,6 +215,22 @@ The colour is the event's (or its category's, calendar's…) at 30 % opacity, `-
 | Delete: this / following / all | Skip the date / end the series the day before / remove the series. | `'exclude'` / `'truncate'` / `onEventDelete(id, info)` |
 
 If the repeat rule itself changes in the form, *This event* is not offered. Choosing *Does not repeat* turns the series into that one event.
+
+### Days off
+
+```javascript
+new Agendo('#calendar', { daysOff: 'weekend' });                        // Saturday and Sunday
+new Agendo('#calendar', { daysOff: ['weekend', 3, '2026-12-25'] });     // + every Wednesday, + Christmas
+new Agendo('#calendar', { daysOff: date => date.getDate() === 1 });     // your own rule
+```
+
+Days off are striped in every view (day columns, headers, month and year days, timeline rows). On them, the user cannot:
+
+- create an event: drag to create, or a click in month view, shows "… is a day off" instead of opening the form (`openCreateModal` too);
+- move or resize an event so that it touches a day off: the event goes back, with the same message;
+- save the form with dates that touch a day off: the message shows on the start date.
+
+An event covers every day from its start to its end, so a Friday-to-Monday event touches the weekend. Code that adds events itself can ask `calendar.isDayOff(date)` (a `Date` or `'YYYY-MM-DD'`); the demo's event generator (*Performance test*) uses it to put no event on a day off. An event already on a day off can still be opened and saved as long as its dates do not change. Background events are not concerned, and neither are changes made through the API (`addEvent`, `updateEvent`, `setEvents`), nor the occurrences of a recurring event that fall on a day off. The stripes use `--ago-day-off-bg` and `--ago-day-off-stripe`.
 
 ## 🧩 Plugins
 
@@ -334,7 +352,8 @@ Loaded values are given their type: `"12"` becomes `12` for a number, `"true"` b
 | `addEvent(event)` | `Object` | Add a single event and re-render. Returns normalized event. |
 | `updateEvent(id, updates)` | `string, Object` | Update properties on an existing event. |
 | `deleteEvent(id)` | `string` | Remove an event by its ID. |
-| `openCreateModal(start, end, resourceId?)` | `Date, Date, string` | Manually trigger the "New Event" dialog. |
+| `openCreateModal(start, end, resourceId?)` | `Date, Date, string` | Manually trigger the "New Event" dialog; refused with a message when the dates touch a day off (`daysOff`). |
+| `isDayOff(date)` | `Date \| string` | `true` when the date is a day off (`daysOff` option), for code that adds events itself. |
 | `openEditModal(event)` | `Object` | Manually trigger the "Edit Event" dialog. |
 | `setTheme(name)` | `string \| null` | Switch theme (`null` = default look). |
 | `destroy()` | — | Unbind timers, empty container, and clean up classes. |
@@ -382,6 +401,7 @@ Override the `--ago-*` properties on `.agendo` (or on a `.ago-theme-<name>` clas
 | `--ago-danger`, `--ago-danger-hover`, `--ago-on-danger` | Delete button |
 | `--ago-bgevent-color`, `--ago-bgevent-alpha` | Background events without a colour (`#8fdf82`), and their opacity (`30%`) |
 | `--ago-current-time`, `--ago-today-bg` | Now indicator, today's column in timelines |
+| `--ago-day-off-bg`, `--ago-day-off-stripe` | Days off (`daysOff`): tint and diagonal stripes, translucent so the grid lines show through |
 | `--ago-event-bg`, `--ago-event-color`, `--ago-event-border-radius` | Events without their own `color` |
 | `--ago-radius`, `--ago-btn-radius`, `--ago-dialog-radius` | Corner radii |
 | `--ago-btn-padding`, `--ago-btn-font-size`, `--ago-btn-font-weight`, `--ago-btn-bg`, `--ago-btn-hover-bg`, `--ago-btn-shadow` | Toolbar buttons |
@@ -402,7 +422,7 @@ node server/server.js
 python -m http.server 8000
 ```
 
-Then open `http://localhost:8000` in your browser. The moon / sun button in the header switches the page and the calendar between light and dark (the first visit follows the OS). The **Customize** button opens a sidebar to try the options live: theme, colour scheme (light, dark, auto), view buttons, locale, first day of the week, 24-hour clock, week numbers, hours and business hours, slot length and height, current time line, events per month day, resources, custom timeline, calendar and category filter, all-day row, plugins (holidays, conflict checker, iCalendar, time progress, custom fields), read-only and editing switches (create, move, resize, all-day events, recurring events) and the hover popover. Its *Background events* section lists the background events and adds, edits or deletes them (title, shade this time or everything else, colour, all day, dates, resource, repeat) through `addEvent`, `updateEvent` and `deleteEvent`, since background events cannot be clicked in the calendar. Each change rebuilds the calendar with the new options and keeps its events, date, view and filter; the settings are remembered in the browser, *Reset to defaults* restores them, and *Options code* shows the matching `new Agendo(…)` options to copy.
+Then open `http://localhost:8000` in your browser. The moon / sun button in the header switches the page and the calendar between light and dark (the first visit follows the OS). The **Customize** button opens a sidebar to try the options live: theme, colour scheme (light, dark, auto), view buttons, locale, first day of the week, 24-hour clock, week numbers, hours and business hours, slot length and height, current time line, events per month day, resources, custom timeline, calendar and category filter, all-day row, plugins (holidays, conflict checker, iCalendar, time progress, custom fields), days off (weekdays, a *Week end* shortcut, other dates), read-only and editing switches (create, move, resize, change past events, all-day events, recurring events) and the hover popover. Its *Database* section shows what the database stores (see [Database demo](#database-demo-nodejs)). Its *Background events* section lists the background events and adds, edits or deletes them (title, shade this time or everything else, colour, all day, dates, resource, repeat) through `addEvent`, `updateEvent` and `deleteEvent`, since background events cannot be clicked in the calendar. Each change rebuilds the calendar with the new options and keeps its events, date, view and filter; the settings are remembered in the browser, *Reset to defaults* restores them, and *Options code* shows the matching `new Agendo(…)` options to copy.
 
 In the sidebar, the Tabler, Bootstrap and Bulma themes load their framework from the jsDelivr CDN (pinned versions with integrity hashes).
 
@@ -440,7 +460,7 @@ Each event is stored whole (custom fields included) with its time span indexed f
 
 ### Performance test
 
-The line above the calendar shows the time of the last render (view change, previous / next, today): build time, time until painted, events loaded and events in the dates on screen. The *Performance test* section of the Customize sidebar generates 10 to 1,000,000 events in the browser (`data/generate-events.js`, deterministic: the same count gives the same events), spread over a month, a year or five years, and reports the time of each step (generate, `setEvents`, first render, until painted). *Benchmark all views* renders every view in turn with the time of each; *Restore demo data* brings the sample events back.
+The line above the calendar shows the time of the last render (view change, previous / next, today): build time, time until painted, events loaded and events in the dates on screen. The *Performance test* section of the Customize sidebar generates 10 to 1,000,000 events in the browser (`data/generate-events.js`, deterministic: the same count gives the same events), spread over a month, a year or five years, and reports the time of each step (generate, `setEvents`, first render, until painted). No event is generated on a day off (*Customize → Days off*): the generator takes `isDayOff: d => calendar.isDayOff(d)` and still makes the number of events asked for, on the other days. *Benchmark all views* renders every view in turn with the time of each; *Restore demo data* brings the sample events back (with *Database storage* on, it loads the database's events again).
 
 Each render keeps only the events overlapping the dates on screen (one pass over the events), so the views then work on those alone; the cost of a view grows with the events it shows, not with the events loaded.
 

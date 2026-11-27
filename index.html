@@ -232,6 +232,26 @@
           <label class="switch"><input type="checkbox" name="eventPopover"><span>Hover popover</span></label>
         </fieldset>
 
+        <fieldset>
+          <legend>Days off</legend>
+          <div class="days-off-head">
+            <span class="field-label">No events can be added on</span>
+            <button type="button" class="demo-btn small" id="days-off-weekend" aria-pressed="false">Week end</button>
+          </div>
+          <div class="chips" role="group" aria-label="Days off">
+            <label><input type="checkbox" name="daysOff" value="1"><span>Mon</span></label>
+            <label><input type="checkbox" name="daysOff" value="2"><span>Tue</span></label>
+            <label><input type="checkbox" name="daysOff" value="3"><span>Wed</span></label>
+            <label><input type="checkbox" name="daysOff" value="4"><span>Thu</span></label>
+            <label><input type="checkbox" name="daysOff" value="5"><span>Fri</span></label>
+            <label><input type="checkbox" name="daysOff" value="6"><span>Sat</span></label>
+            <label><input type="checkbox" name="daysOff" value="0"><span>Sun</span></label>
+          </div>
+          <label class="field">Other dates
+            <input type="text" name="daysOffDates" placeholder="2026-12-24, 2026-12-25" autocomplete="off" spellcheck="false">
+          </label>
+        </fieldset>
+
         <details class="customize-code">
           <summary>Options code</summary>
           <pre><code id="customize-code"></code></pre>

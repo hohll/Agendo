@@ -404,6 +404,11 @@ h1 {
 .chips.plugin-sub { margin-top: -4px; }
 .chips:has(input:disabled) { opacity: 0.5; }
 
+/* Days off section */
+.days-off-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.days-off-head .field-label { margin-bottom: 0; }
+#days-off-weekend[aria-pressed="true"] { color: var(--primary); background: var(--chip-active-bg); border-color: var(--primary); font-weight: 600; }
+
 /* Database panel: the stored rows */
 .customize fieldset[hidden] { display: none; }
 .db-actions { display: flex; flex-wrap: wrap; gap: 6px; }

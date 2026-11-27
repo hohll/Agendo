@@ -39,6 +39,8 @@
   --ago-dialog-shadow: 0 20px 25px rgb(0 0 0 / 0.2);
   --ago-focus-ring: color-mix(in srgb, var(--ago-primary) 20%, transparent);
   --ago-title-font-size: calc(1.15 * var(--ago-rem));
+  --ago-day-off-bg: rgb(100 116 139 / 0.07);     /* days off (daysOff option): a tint with diagonal stripes */
+  --ago-day-off-stripe: rgb(100 116 139 / 0.14);
 
   display: flex;
   flex-direction: column;
@@ -128,6 +130,8 @@
   --ago-dialog-shadow: 0 20px 30px rgb(0 0 0 / 0.6);
   --ago-focus-ring: rgb(96 165 250 / 0.35);
   --ago-today-bg: rgb(250 204 21 / 0.08);
+  --ago-day-off-bg: rgb(148 163 184 / 0.06);
+  --ago-day-off-stripe: rgb(148 163 184 / 0.12);
 }
 /* The timeline's today band multiplies on light backgrounds; on dark ones it is a plain tint. */
 .agendo.ago-dark .ago-tl-today { mix-blend-mode: normal; }
@@ -1078,3 +1082,25 @@
 .ago-yday.ago-today .ago-yday-num { color: var(--ago-on-primary); background: var(--ago-primary); }
 .ago-ydots { display: flex; gap: 2px; height: 5px; }
 .ago-ydots i { width: 5px; height: 5px; border-radius: 50%; background: var(--ago-ev, var(--ago-event-bg)); }
+
+/* --- Days off (daysOff option): striped, and no event can be added there --- */
+.agendo {
+  --ago-day-off: repeating-linear-gradient(135deg, var(--ago-day-off-stripe) 0 1px, transparent 1px 8px),
+    linear-gradient(var(--ago-day-off-bg), var(--ago-day-off-bg));
+}
+.ago-col.ago-day-off::before,
+.ago-tl-off {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--ago-day-off);
+  pointer-events: none;
+}
+.ago-col.ago-day-off::before { left: 0; right: 0; }
+.ago-day-head.ago-day-off,
+.ago-cell.ago-day-off,
+.ago-tl-date.ago-day-off,
+.ago-tl-daycell.ago-day-off,
+.ago-yday.ago-day-off { background-image: var(--ago-day-off); }
+.ago-day-head.ago-day-off .ago-day-name { color: var(--ago-text-muted); }
