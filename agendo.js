@@ -1739,24 +1739,25 @@ class Agendo {
 
   // --- Days off (daysOff option): no event can be added there ---
 
-  // Whether `date` is a day off. The option is read into a test once, then again when it changes.
+  // Whether `date` is a day off. The option is read into a test, read again when its content changes
+  // (an array changed in place included); Date entries count by their local day.
   _isDayOff(date) {
     const src = this.o.daysOff;
     if (!src) return false;
-    if (this._offSrc !== src) {
-      this._offSrc = src;
-      if (typeof src === 'function') this._offTest = src;
-      else {
-        const weekdays = new Set(), dates = new Set();
-        for (const x of [].concat(src)) {
-          if (x === 'weekend') { weekdays.add(0); weekdays.add(6); }
-          else if (typeof x === 'number') weekdays.add(x);
-          else dates.add(String(x));
-        }
-        this._offTest = d => weekdays.has(d.getDay()) || dates.has(dayKey(d));
+    if (typeof src === 'function') return !!src(date);
+    const list = [].concat(src).map(x => (x instanceof Date ? dayKey(x) : x));
+    const key = JSON.stringify(list);
+    if (this._offKey !== key) {
+      this._offKey = key;
+      const weekdays = new Set(), dates = new Set();
+      for (const x of list) {
+        if (x === 'weekend') { weekdays.add(0); weekdays.add(6); }
+        else if (typeof x === 'number') weekdays.add(x);
+        else dates.add(String(x));
       }
+      this._offTest = d => weekdays.has(d.getDay()) || dates.has(dayKey(d));
     }
-    return !!this._offTest(date);
+    return this._offTest(date);
   }
 
   // The first day off that [start, end) touches, or null.
