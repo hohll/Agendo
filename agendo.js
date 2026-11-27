@@ -444,7 +444,7 @@ class Agendo {
     const sep = i => (grouped && n > 1 && i > 0 && i % R === 0 ? ' ago-date-start' : '');
     const dayHead = (d, i) => `
       <div class="ago-day-head${sameDay(d, now) ? ' ago-today' : ''}${this._isDayOff(d) ? ' ago-day-off' : ''}${sep(i * R)}" style="grid-column: span ${R}">
-        <div class="ago-day-name">${this.fmt.weekday.format(d)}</div>
+        <div class="ago-day-name"><span class="ago-wd">${this.fmt.weekday.format(d)}</span><span class="ago-wd-narrow">${this.fmt.weekdayNarrow.format(d)}</span></div>
         <div class="ago-day-num">${d.getDate()}</div>
       </div>`;
     const resHead = (r, i) => `

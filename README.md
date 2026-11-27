@@ -43,6 +43,7 @@ That project is itself inspired by and based on the classic [jquery-week-calenda
 - **Native Localization**: Built-in 12-hour or 24-hour display using the standard `Intl.DateTimeFormat` API and browser locales.
 - **Built-in Event Modal**: HTML5 `<dialog>` form for creating, editing, and deleting events with keyboard and validation support.
 - **Business Hours**: Visual highlighting for configurable working hours.
+- **Responsive**: when the calendar itself is narrower than 640px (a phone, or a narrow column on a wide page: a container query), the toolbar gets compact, day headers show one letter ("M 23") and the hour column narrows.
 - **Dark Mode**: `colorScheme: 'dark'`, `'light'` or `'auto'` (follows the OS, live). The framework themes switch to their own dark palette with it.
 - **Theming**: Every colour, radius and shadow is a CSS custom property. Ready-made themes for **Tabler**, **Bootstrap 5** and **Bulma 1.x** follow the framework's own variables, including its dark mode.
 

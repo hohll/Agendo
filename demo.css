@@ -49,7 +49,7 @@ body {
   color: var(--text);
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh;
   box-sizing: border-box;
 }
 
@@ -304,14 +304,14 @@ h1 {
     position: fixed;
     inset: 0 0 0 auto;
     z-index: 100;
-    width: min(var(--panel-width), 100vw);
+    width: min(var(--panel-width), 100%);   /* 100vw would include the scrollbar */
     margin: 0;
     border-radius: 0;
     box-shadow: -8px 0 24px rgba(15, 23, 42, 0.15);
     transform: translateX(100%);
     transition: transform 0.25s ease;
   }
-  .customize.is-open { width: min(var(--panel-width), 100vw); margin: 0; transform: none; }
+  .customize.is-open { width: min(var(--panel-width), 100%); margin: 0; transform: none; }
   .customize > * { width: 100%; }
 }
 
@@ -397,7 +397,22 @@ h1 {
 .perf-table th:first-child,
 .perf-table td:first-child { text-align: left; }
 .perf-table th { font-weight: 600; color: var(--muted); }
-@media (max-width: 900px) { .info-bar { flex-wrap: wrap; } .perf { white-space: normal; } }
+@media (max-width: 900px) { .info-bar { flex-wrap: wrap; } .perf { flex: 1 1 100%; min-width: 0; white-space: normal; } }
+
+/* Phones: smaller margins and header; the page scrolls and the calendar keeps a usable height
+   instead of being squeezed between the header and the bottom of the screen. */
+@media (max-width: 600px) {
+  body { height: auto; min-height: 100dvh; padding: 10px; }
+  header { gap: 8px; margin-bottom: 10px; }
+  h1 { gap: 8px; font-size: 1.15rem; }
+  h1 img { width: 26px; height: 26px; }
+  .header-tools { gap: 6px; }
+  .customize-btn { padding: 6px 10px; }
+  .info-bar { gap: 6px; margin-bottom: 10px; font-size: 0.78rem; }
+  .demo-main { flex: none; }
+  #calendar-container { height: max(520px, 80dvh); }
+}
+@media (max-width: 480px) { .badge { display: none; } }
 
 /* Plugins section: a plugin's own options sit under it, indented */
 .plugin-sub { margin-left: 44px; }

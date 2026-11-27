@@ -54,7 +54,7 @@
   user-select: none;
 }
 
-.agendo { position: relative; }
+.agendo { position: relative; container: agendo / inline-size; }   /* narrow layout: @container agendo, at the end */
 .ago-plugin-tools:empty { display: none; }
 
 /* Icon buttons with a label on hover and keyboard focus: <button class="ago-btn ago-icon-btn" data-tip="…"> */
@@ -1119,3 +1119,22 @@
 .ago-tl-daycell.ago-day-off,
 .ago-yday.ago-day-off { background-image: var(--ago-day-off); }
 .ago-day-head.ago-day-off .ago-day-name { color: var(--ago-text-muted); }
+
+/* --- Narrow calendar (phone, narrow column): follows the calendar's own width, not the screen's --- */
+.ago-wd-narrow { display: none; }
+@container agendo (max-width: 640px) {
+  .ago-toolbar { gap: 8px; padding: 8px 10px; }
+  .ago-title { order: -1; flex: 1 1 auto; font-size: calc(0.95 * var(--ago-rem)); }   /* first, Today ← → beside it when they fit */
+  .ago-tools,
+  .ago-views { gap: 6px; }
+  .ago-group { gap: 4px; }
+  .ago-btn { padding: 4px 9px; font-size: calc(0.8 * var(--ago-rem)); }
+  .ago-icon-btn { padding-inline: 7px; }
+  .ago-grid { --ago-time-col-width: 44px; }
+  .ago-gutter span { right: 4px; font-size: calc(0.65 * var(--ago-rem)); }
+  .ago-day-head { padding: 6px 2px; }
+  .ago-wd { display: none; }
+  .ago-wd-narrow { display: inline; }
+  .ago-day-num { width: 24px; font-size: calc(0.9 * var(--ago-rem)); line-height: 24px; }
+  .ago-allday-label { font-size: calc(0.6 * var(--ago-rem)); line-height: 1.1; text-align: center; }
+}
