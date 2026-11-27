@@ -51,8 +51,10 @@
     <aside id="customize" class="customize" aria-labelledby="customize-title" inert>
       <div class="customize-head">
         <h2 id="customize-title">Customize</h2>
+        <button type="button" class="demo-btn small" id="fold-all">Collapse all</button>
         <button type="button" class="customize-close" data-close aria-label="Close">&times;</button>
       </div>
+      <!-- Each section folds with its heading (demo.js turns every legend into a button) -->
       <form id="customize-form" class="customize-body">
         <fieldset>
           <legend>Theme</legend>
@@ -136,9 +138,16 @@
 
         <fieldset>
           <legend>Data</legend>
-          <label class="switch"><input type="checkbox" name="resources"><span>Resources (Desk 1–3)</span></label>
+          <label class="switch"><input type="checkbox" name="resources"><span>Resources</span></label>
           <label class="switch"><input type="checkbox" name="timelineCustom"><span>Custom timeline (3 days)</span></label>
           <label class="switch"><input type="checkbox" name="filters"><span>Calendars &amp; categories filter</span></label>
+        </fieldset>
+
+        <!-- Shown only when Data → Resources is on (demo.js, through setResources) -->
+        <fieldset id="res-panel">
+          <legend>Resources <span class="section-count" id="res-count"></span></legend>
+          <ul class="bg-list res-list" id="res-list" aria-label="Resources, in column order"></ul>
+          <button type="button" class="demo-btn" id="res-add">+ Add resource</button>
         </fieldset>
 
         <fieldset>
@@ -299,10 +308,26 @@
     </form>
   </dialog>
 
+  <!-- Add / edit a resource (demo.js, through setResources) -->
+  <dialog id="res-dialog" class="demo-dialog" aria-labelledby="res-dialog-title">
+    <form method="dialog" id="res-form">
+      <h2 id="res-dialog-title">Resource</h2>
+      <label class="field">Name <input name="title" required maxlength="60" placeholder="e.g. Meeting room" autocomplete="off"></label>
+      <label class="field">Colour <input type="color" name="color" value="#3b82f6"></label>
+      <small class="res-note" id="res-note"></small>
+      <div class="demo-dialog-foot">
+        <button value="delete" class="demo-btn danger" formnovalidate>Delete</button>
+        <span></span>
+        <button value="cancel" class="demo-btn" formnovalidate>Cancel</button>
+        <button value="save" class="demo-btn primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
   <footer class="demo-footer">
     Based on <a href="https://github.com/markmclaren/simple-week-calendar-js">simple-week-calendar-js</a>
     by <a href="https://github.com/markmclaren">Mark McLaren</a> &mdash; thank you!
-    <br>Themes for <a href="https://tabler.io">Tabler</a>, <a href="https://getbootstrap.com">Bootstrap</a>
+    &middot; Themes for <a href="https://tabler.io">Tabler</a>, <a href="https://getbootstrap.com">Bootstrap</a>
     and <a href="https://bulma.io">Bulma</a>; icons from <a href="https://tabler.io/icons">Tabler Icons</a> (MIT)
   </footer>
 

@@ -93,6 +93,7 @@ const DEFAULTS = {
   allDaySlot: true,
   monthMaxEvents: 3,
   resources: true,
+  resourceList: RESOURCES, // edited in the Resources section
   timelineCustom: true,
   filters: true,
   readonly: false,
@@ -125,6 +126,8 @@ function loadSettings() {
     const s = { ...DEFAULTS, ...saved };
     if (s.theme && !['tabler', 'bootstrap', 'bulma'].includes(s.theme)) s.theme = '';  // a theme that was removed
     if (!['light', 'dark', 'auto'].includes(s.colorScheme)) s.colorScheme = DEFAULTS.colorScheme;
+    const okRes = r => r && typeof r.id === 'string' && typeof r.title === 'string';
+    if (!Array.isArray(s.resourceList) || !s.resourceList.every(okRes)) s.resourceList = DEFAULTS.resourceList;
     return s;
   } catch { return { ...DEFAULTS }; }
 }
@@ -183,7 +186,7 @@ function toOptions(s) {
     showCurrentTime: s.showCurrentTime,
     allDaySlot: s.allDaySlot,
     monthMaxEvents: s.monthMaxEvents,
-    resources: s.resources ? RESOURCES : [],
+    resources: s.resources ? s.resourceList : [],
     timelineCustom: s.timelineCustom ? TIMELINE_CUSTOM : null,
     calendars: s.filters ? CALENDARS : [],
     categories: s.filters ? CATEGORIES : [],
@@ -236,12 +239,12 @@ function buildCalendar() {
     daysToShow: prev?.view ?? 7,
     events: prev?.events ?? [],
     onFilterChange: f => logAction(`Filter: ${[...f.calendars, ...f.categories].join(', ') || 'nothing'} shown`),
-    onEventChange: (ev, action, info) => { logAction(`${action}${info ? ` (${info.scope})` : ''}: "${ev.title}" ${fmt(ev.start)} – ${fmt(ev.end)}`); refreshDbSoon(); },
-    onEventCreate: (ev, info) => { logAction(`Created "${ev.title}"${info ? ` (${info.scope})` : ''}`); refreshDbSoon(); },
-    onEventDelete: (id, info) => { logAction(`Deleted event ${id}${info ? ` (${info.scope})` : ''}`); refreshDbSoon(); }
+    onEventChange: (ev, action, info) => { logAction(`${action}${info ? ` (${info.scope})` : ''}: "${ev.title}" ${fmt(ev.start)} – ${fmt(ev.end)}`); refreshDbSoon(); renderResList(); },
+    onEventCreate: (ev, info) => { logAction(`Created "${ev.title}"${info ? ` (${info.scope})` : ''}`); refreshDbSoon(); renderResList(); },
+    onEventDelete: (id, info) => { logAction(`Deleted event ${id}${info ? ` (${info.scope})` : ''}`); refreshDbSoon(); renderResList(); }
   });
   showCode(opts);
-  renderBgList();
+  renderLists();
   watchRenders();
   if (storageChanged && !settings.storage) loadSample();
   builtWithStorage = settings.storage;
@@ -285,6 +288,7 @@ function showDbPanel() {
   let open = false;
   try { open = localStorage.getItem(DB_OPEN_KEY) === '1'; } catch { /* storage unavailable */ }
   document.getElementById('db-panel').hidden = !settings.storage;
+  showFoldAll();
   document.getElementById('db-body').hidden = !open;
   const btn = document.getElementById('db-toggle');
   btn.setAttribute('aria-expanded', open);
@@ -389,7 +393,7 @@ document.getElementById('db-empty').addEventListener('click', async () => {
     note.textContent = `${num(deleted)} events deleted.`;
     logAction(`Database emptied: ${num(deleted)} events deleted`);
     storage()?.reload();
-    renderBgList();
+    renderLists();
     showStorageStatus();
   } catch (err) {
     note.textContent = `Could not empty the database: ${err.message}`;
@@ -418,6 +422,57 @@ panel.addEventListener('keydown', e => {
   // Escape inside an open calendar dialog or menu is theirs; here it only closes the sidebar.
   if (e.key === 'Escape') { e.preventDefault(); setPanel(false); }
 });
+
+// --- Folding sections: each legend becomes a button that shows or hides the rest of its section ---
+// The closed sections are remembered in this browser (all open by default). The button in the
+// sidebar's head folds them all, or unfolds them all once every section shown is folded.
+
+const FOLD_KEY = 'ago-demo-closed-sections';
+let closedSections;
+try { closedSections = new Set(JSON.parse(localStorage.getItem(FOLD_KEY) || '[]')); } catch { closedSections = new Set(); }
+
+const sections = [];   // { key, fieldset, show(open), isOpen() }
+const foldAllBtn = document.getElementById('fold-all');
+
+function saveClosed() {
+  try { localStorage.setItem(FOLD_KEY, JSON.stringify([...closedSections])); } catch { /* storage unavailable */ }
+}
+
+// "Collapse all" while a section in view is open, else "Expand all".
+function showFoldAll() {
+  const anyOpen = sections.some(s => !s.fieldset.hidden && s.isOpen());
+  foldAllBtn.textContent = anyOpen ? 'Collapse all' : 'Expand all';
+}
+
+const CHEVRON = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
+
+for (const legend of form.querySelectorAll('fieldset > legend')) {
+  const fieldset = legend.parentElement;
+  const key = legend.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const body = Object.assign(document.createElement('div'), { className: 'section-body', id: `section-${key}` });
+  body.append(...[...fieldset.childNodes].filter(n => n !== legend));
+  fieldset.append(body);
+  const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'section-toggle', innerHTML: CHEVRON });
+  btn.append(...legend.childNodes);
+  btn.setAttribute('aria-controls', body.id);
+  legend.append(btn);
+  const show = open => {
+    btn.setAttribute('aria-expanded', open);
+    body.hidden = !open;
+    closedSections[open ? 'delete' : 'add'](key);
+  };
+  sections.push({ key, fieldset, show, isOpen: () => !body.hidden });
+  show(!closedSections.has(key));
+  btn.addEventListener('click', () => { show(body.hidden); saveClosed(); showFoldAll(); });
+}
+
+foldAllBtn.addEventListener('click', () => {
+  const open = foldAllBtn.textContent === 'Expand all';
+  for (const s of sections) s.show(open);
+  saveClosed();
+  showFoldAll();
+});
+showFoldAll();
 
 // Settings → form controls.
 function fillForm(s) {
@@ -453,6 +508,7 @@ function readForm() {
     allDaySlot: f.allDaySlot.checked,
     monthMaxEvents: num('monthMaxEvents', 1, 10),
     resources: f.resources.checked,
+    resourceList: settings.resourceList,
     timelineCustom: f.timelineCustom.checked,
     filters: f.filters.checked,
     readonly: f.readonly.checked,
@@ -595,7 +651,7 @@ function bgWhen(ev) {
   const when = { none: day(ev.start), daily: 'Every day', weekdays: 'Weekdays',
     weekly: `Every ${ev.start.toLocaleDateString([], { weekday: 'long' })}`, keep: `Repeats from ${day(ev.start)}` }[kind];
   const hours = ev.allDay ? 'all day' : `${time(ev.start)}–${time(ev.end)}`;
-  const res = RESOURCES.find(r => r.id === ev.resourceId);
+  const res = calendar.getResources().find(r => r.id === ev.resourceId);
   return `${when}, ${hours}${res ? ` · ${res.title}` : ''}${ev.display === 'inverse-background' ? ' · outside' : ''}`;
 }
 
@@ -643,7 +699,7 @@ function openBgDialog(ev) {
   f.color.value = ev?.color ?? '#94a3b8';
   f.allDay.checked = !!ev?.allDay;
   setBgDates(f.allDay.checked, start, end);
-  f.resourceId.replaceChildren(new Option('All resources', ''), ...RESOURCES.map(r => new Option(r.title, r.id)));
+  f.resourceId.replaceChildren(new Option('All resources', ''), ...calendar.getResources().map(r => new Option(r.title, r.id)));
   f.resourceId.value = ev?.resourceId ?? '';
   const kind = repeatKind(ev?.recurrence, start);
   f.repeat.querySelector('[value="keep"]').hidden = kind !== 'keep';
@@ -696,7 +752,7 @@ bgForm.addEventListener('submit', e => {
       logAction(`Added background event "${data.title}"`);
     }
   }
-  renderBgList();
+  renderLists();
 });
 
 document.getElementById('bg-add').addEventListener('click', () => openBgDialog(null));
@@ -710,7 +766,122 @@ bgList.addEventListener('click', e => {
   storage()?.remove(ev.id);
   refreshDbSoon();
   logAction(`Deleted background event "${ev.title}"`);
-  renderBgList();
+  renderLists();
+});
+
+// --- Resources: list, add, rename, recolour, reorder, delete (public API: setResources) ---
+// The list is a setting (remembered in this browser, restored by Reset to defaults). Deleting a
+// resource leaves its events alone: they keep their resourceId, so adding back a resource with
+// that id shows them again; meanwhile they only show in the views without resources.
+
+const resPanel = document.getElementById('res-panel');
+const resList = document.getElementById('res-list');
+const resDialog = document.getElementById('res-dialog');
+const resForm = document.getElementById('res-form');
+const RES_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#64748b'];
+let resEditing = null;
+
+function renderLists() { renderBgList(); renderResList(); }
+
+// The events (background events too) linked to each resource id, counted in one pass.
+function resCounts() {
+  const counts = new Map();
+  for (const ev of calendar.getEvents()) if (ev.resourceId != null) counts.set(ev.resourceId, (counts.get(ev.resourceId) ?? 0) + 1);
+  return counts;
+}
+const eventsLabel = n => `${num(n)} event${n === 1 ? '' : 's'}`;
+
+function renderResList() {
+  resPanel.hidden = !settings.resources;
+  showFoldAll();
+  if (!settings.resources) return;
+  const list = settings.resourceList, counts = resCounts();
+  document.getElementById('res-count').textContent = `(${list.length})`;
+  if (!list.length) {
+    resList.replaceChildren(Object.assign(document.createElement('li'), { className: 'bg-empty', textContent: 'None: the resource and timeline views are hidden.' }));
+    return;
+  }
+  resList.replaceChildren(...list.map((r, i) => {
+    const li = document.createElement('li');
+    const swatch = Object.assign(document.createElement('span'), { className: 'bg-swatch' });
+    swatch.style.setProperty('--c', r.color || '#94a3b8');
+    const text = document.createElement('div');
+    text.append(
+      Object.assign(document.createElement('div'), { className: 'bg-name', textContent: r.title }),
+      Object.assign(document.createElement('div'), { className: 'bg-when', textContent: eventsLabel(counts.get(r.id) ?? 0) }));
+    const btn = (label, action, aria, disabled = false) => {
+      const b = Object.assign(document.createElement('button'), { type: 'button', className: 'demo-btn small', textContent: label, disabled });
+      b.dataset[action] = r.id;
+      b.setAttribute('aria-label', `${aria} ${r.title}`);
+      if (label !== aria) b.title = aria;
+      return b;
+    };
+    li.append(swatch, text, btn('↑', 'up', 'Move up', i === 0), btn('↓', 'down', 'Move down', i === list.length - 1),
+      btn('Edit', 'edit', 'Edit'), btn('Delete', 'delete', 'Delete'));
+    return li;
+  }));
+}
+
+// A new resource list: saved with the settings and applied to the calendar in place.
+function setResourceList(list) {
+  settings = { ...settings, resourceList: list };
+  saveSettings();
+  calendar.setResources(list);
+  showCode(toOptions(settings));
+  renderLists();
+}
+
+function deleteResource(r) {
+  setResourceList(settings.resourceList.filter(x => x.id !== r.id));
+  const n = resCounts().get(r.id) ?? 0;
+  logAction(`Deleted resource "${r.title}"${n ? ` (its ${eventsLabel(n)} kept, out of the resource views)` : ''}`);
+}
+
+function openResDialog(r) {
+  resEditing = r;
+  const f = resForm.elements, used = new Set(settings.resourceList.map(x => x.color));
+  f.title.value = r?.title ?? '';
+  f.color.value = r?.color ?? RES_COLORS.find(c => !used.has(c)) ?? RES_COLORS[settings.resourceList.length % RES_COLORS.length];
+  const n = r ? resCounts().get(r.id) ?? 0 : 0;
+  document.getElementById('res-note').textContent = n
+    ? `${eventsLabel(n)} on this resource. Deleting it keeps them; they then only show in the views without resources.` : '';
+  resForm.querySelector('[value="delete"]').hidden = !r;
+  document.getElementById('res-dialog-title').textContent = r ? 'Edit resource' : 'New resource';
+  resDialog.showModal();
+}
+
+resForm.addEventListener('submit', e => {
+  const f = resForm.elements, action = e.submitter?.value;
+  if (action === 'delete' && resEditing) deleteResource(resEditing);
+  else if (action === 'save') {
+    const data = { title: f.title.value.trim() || 'Resource', color: f.color.value };
+    if (resEditing) {
+      setResourceList(settings.resourceList.map(x => (x.id === resEditing.id ? { ...x, ...data } : x)));
+      logAction(`Updated resource "${data.title}"`);
+    } else {
+      setResourceList([...settings.resourceList, { id: `res-${Date.now().toString(36)}`, ...data }]);
+      logAction(`Added resource "${data.title}"`);
+    }
+  }
+});
+
+document.getElementById('res-add').addEventListener('click', () => openResDialog(null));
+resList.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const { up, down, edit, delete: del } = btn.dataset;
+  const list = [...settings.resourceList], i = list.findIndex(x => x.id === (up ?? down ?? edit ?? del));
+  if (i < 0) return;
+  if (edit) return openResDialog(list[i]);
+  if (del) return deleteResource(list[i]);
+  const j = up ? i - 1 : i + 1;
+  if (j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  setResourceList(list);
+  // Keep the focus on the row that moved: the same arrow, or the other one at the top / bottom.
+  const id = CSS.escape(list[j].id);
+  (resList.querySelector(`[data-${up ? 'up' : 'down'}="${id}"]:not(:disabled)`)
+    ?? resList.querySelector(`[data-${up ? 'down' : 'up'}="${id}"]`))?.focus();
 });
 
 // --- Performance: time of every render, load tests, benchmark of every view ---
@@ -790,7 +961,7 @@ async function loadTest() {
   await nextPaint();
   rows.push(['Total, until painted', ms(performance.now() - t0)]);
   showResults(`${num(n)} events generated over ${days} days`, rows);
-  renderBgList();
+  renderLists();
   logAction(`Loaded ${num(n)} events`);
 }
 
@@ -825,7 +996,7 @@ document.getElementById('perf-load').addEventListener('click', loadTest);
 document.getElementById('perf-bench').addEventListener('click', benchmark);
 document.getElementById('perf-restore').addEventListener('click', () => {
   // With database storage on, "restore" reloads the database's events.
-  const done = () => { calendar.today(); renderBgList(); perfResults.textContent = ''; logAction('Demo data restored'); };
+  const done = () => { calendar.today(); renderLists(); perfResults.textContent = ''; logAction('Demo data restored'); };
   if (storage()) { storage().reload(); done(); } else loadSample().then(done);
 });
 // These controls are not calendar options: keep them out of the settings form.
@@ -882,7 +1053,7 @@ function shiftToThisWeek(events) {
 function loadSample() {
   return fetch('events.json')
     .then(r => r.json())
-    .then(data => { calendar.setEvents(shiftToThisWeek(data)); renderBgList(); })
+    .then(data => { calendar.setEvents(shiftToThisWeek(data)); renderLists(); })
     .catch(err => console.warn('Could not load events.json (serve over HTTP):', err));
 }
 if (!settings.storage) loadSample();
