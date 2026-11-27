@@ -178,6 +178,27 @@ function send(res, status, body, type = 'application/json; charset=utf-8') {
   res.end(body === undefined ? undefined : type.startsWith('application/json') ? JSON.stringify(body) : body);
 }
 
+// The API answers the demo page only. A page of another site could otherwise send writes:
+// a cross-origin POST with a text/plain body needs no preflight, so writes must be JSON (which
+// does need one, and this server answers none) and must not come from another origin. While the
+// server listens on 127.0.0.1, a Host other than this machine (DNS rebinding) is refused too.
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+function checkRequest(req) {
+  const refuse = (status, msg) => { throw Object.assign(new Error(msg), { status }); };
+  const host = req.headers.host ?? '';
+  if (HOST === '127.0.0.1' && !LOCAL_HOSTS.has(host.replace(/:\d+$/, ''))) refuse(403, 'Unknown host');
+  if (req.method === 'GET' || req.method === 'HEAD') return;
+  const origin = req.headers.origin;
+  if (origin) {
+    let same = false;
+    try { same = new URL(origin).host === host; } catch { /* "null" or malformed */ }
+    if (!same) refuse(403, 'Cross-origin request refused');
+  }
+  if ((req.method === 'POST' || req.method === 'PUT') && !/^application\/json\b/i.test(req.headers['content-type'] ?? '')) {
+    refuse(415, 'Content-Type must be application/json');
+  }
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let size = 0;
@@ -212,6 +233,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   const match = /^\/api\/events(?:\/([^/]+))?\/?$/.exec(url.pathname);
   try {
+    if (url.pathname.startsWith('/api/')) checkRequest(req);
     if (url.pathname === '/api/health') return send(res, 200, { ok: true, storage: store.kind, events: store.count() });
     if (url.pathname === '/api/rows' && req.method === 'GET') {
       const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 100));
