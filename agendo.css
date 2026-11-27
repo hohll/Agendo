@@ -1135,7 +1135,8 @@
 .ago-narrow .ago-grid { --ago-time-col-width: 44px; }
 .ago-narrow .ago-gutter span { right: 4px; font-size: calc(0.65 * var(--ago-rem)); }
 .ago-narrow .ago-day-head { padding: 6px 2px; }
-.ago-narrow .ago-wd { display: none; }
+/* The short name stays for screen readers ("M" alone is Tuesday or Wednesday), the letter is shown instead */
+.ago-narrow .ago-wd { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .ago-narrow .ago-wd-narrow { display: inline; }
 .ago-narrow .ago-day-num { width: 24px; font-size: calc(0.9 * var(--ago-rem)); line-height: 24px; }
 .ago-narrow .ago-allday-label { font-size: calc(0.6 * var(--ago-rem)); line-height: 1.1; text-align: center; }
