@@ -7,6 +7,8 @@
 
 # Agendo
 
+**[▶ Live demo](https://hohll.github.io/Agendo/)**: try every view and option in the browser.
+
 **Agendo** is a lightweight calendar component built with **pure Vanilla JavaScript** and **zero dependencies**: day, week, month, year and list views, resource columns and timelines, calendar and category filters, drag & drop, and themes for Tabler, Bootstrap and Bulma.
 
 > Agendo started as a fork of **[simple-week-calendar-js](https://github.com/markmclaren/simple-week-calendar-js)** by [Mark McLaren](https://github.com/markmclaren). Many thanks to him for the clean, zero-dependency week calendar this project grew from. See [Acknowledgments](#-license-and-acknowledgments).
@@ -411,6 +413,8 @@ Override the `--ago-*` properties on `.agendo` (or on a `.ago-theme-<name>` clas
 ---
 
 ## 🖥️ Running the Demo
+
+The demo is online at **https://hohll.github.io/Agendo/**, published from `main` by GitHub Pages (`.github/workflows/pages.yml`). It runs there without the Node.js server, so *Database storage* is not available: run the demo locally for that.
 
 Because [`index.html`](file:///index.html) fetches [`events.json`](file:///events.json) using the `fetch()` API, run a lightweight HTTP server in the repository root rather than opening via `file://`:
 
