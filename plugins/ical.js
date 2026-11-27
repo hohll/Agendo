@@ -95,9 +95,9 @@
     function parse(ics) {
       const lines = String(ics).replace(/\r\n[ \t]|\n[ \t]/g, '').split(/\r?\n/);   // unfold
       const events = [];
-      let cur = null;
+      let cur = null, nested = 0;   // nested: depth of components inside the VEVENT (VALARM…), skipped
       for (const line of lines) {
-        if (line === 'BEGIN:VEVENT') { cur = { props: {}, exdates: [] }; continue; }
+        if (line === 'BEGIN:VEVENT') { cur = { props: {}, exdates: [] }; nested = 0; continue; }
         if (line === 'END:VEVENT') { if (cur) events.push(cur); cur = null; continue; }
         if (!cur) continue;
         const colon = line.search(/:(?=(?:[^"]*"[^"]*")*[^"]*$)/);
@@ -107,6 +107,9 @@
         const value = line.slice(colon + 1), key = name.toUpperCase();
         if (key === 'EXDATE') cur.exdates.push(...value.split(',').map(v => readDate(v, params)?.date).filter(Boolean));
         else cur.props[key] = { value, params };
+        if (/^BEGIN:/i.test(line)) { nested++; continue; }
+        if (/^END:/i.test(line)) { nested = Math.max(0, nested - 1); continue; }
+        if (nested) continue;   // an alarm's DESCRIPTION or SUMMARY is not the event's
       }
 
       const out = [];
