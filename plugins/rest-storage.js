@@ -20,6 +20,13 @@
   const day = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const monthKey = d => d.getFullYear() * 12 + d.getMonth();
 
+  // English texts; locales/*.js translate them (calendar.t, see Agendo.locales).
+  if (typeof Agendo !== 'undefined') Agendo.addLocale('en', {
+    'restStorage.loadFailed': 'Could not load the events',
+    'restStorage.saveFailed': 'Could not save "{title}"',
+    'restStorage.deleteFailed': 'Could not delete the event'
+  });
+
   function restStorage({ url = '/api/events', headers = {}, onError = null } = {}) {
     let calendar;
     const loaded = new Set();   // months already fetched (year * 12 + month)
@@ -67,18 +74,19 @@
         if (fresh.length) calendar.setEvents([...calendar.getEvents(), ...fresh]);
       } catch (err) {
         months.forEach(m => loaded.delete(m));   // try again next time
-        fail(err, 'Could not load the events');
+        fail(err, calendar.t('restStorage.loadFailed'));
       }
     }
 
-    const save = ev => request('PUT', `/${encodeURIComponent(ev.id)}`, serialize(ev)).catch(err => fail(err, `Could not save "${ev.title}"`));
-    const remove = id => request('DELETE', `/${encodeURIComponent(id)}`).catch(err => fail(err, 'Could not delete the event'));
+    const saveFailed = ev => calendar.t('restStorage.saveFailed', { title: ev.title });
+    const save = ev => request('PUT', `/${encodeURIComponent(ev.id)}`, serialize(ev)).catch(err => fail(err, saveFailed(ev)));
+    const remove = id => request('DELETE', `/${encodeURIComponent(id)}`).catch(err => fail(err, calendar.t('restStorage.deleteFailed')));
 
     return {
       name: 'restStorage',
       install(cal) { calendar = cal; },
       datesSet(from, to) { load(from, to); },
-      eventCreated(ev) { request('POST', '', serialize(ev)).catch(err => fail(err, `Could not save "${ev.title}"`)); },
+      eventCreated(ev) { request('POST', '', serialize(ev)).catch(err => fail(err, saveFailed(ev))); },
       eventChanged(ev) { save(ev); },
       eventDeleted(id) { remove(id); },
 

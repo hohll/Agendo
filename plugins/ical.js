@@ -60,6 +60,13 @@
     return (sign === '-' ? -1 : 1) * ((((+w * 7 + +d) * 24 + +h) * 60 + +mi) * 60 + +s) * 1000;
   }
 
+  // English texts; locales/*.js translate them (calendar.t, see Agendo.locales).
+  if (typeof Agendo !== 'undefined') Agendo.addLocale('en', {
+    'ical.imported': { one: 'Imported {n} event', other: 'Imported {n} events' },
+    'ical.exported': { one: 'Exported {n} event to {file}', other: 'Exported {n} events to {file}' },
+    'ical.export': 'Export to .ics', 'ical.import': 'Import an .ics file'
+  });
+
   function ical({ filename = 'agendo.ics', exportButton = true, importButton = true, prodId = '-//Agendo//Agendo calendar//EN' } = {}) {
     let calendar;
 
@@ -163,7 +170,7 @@
     function importText(ics) {
       const events = parse(ics), ids = new Set(events.map(e => e.id));
       calendar.setEvents([...calendar.getEvents().filter(e => !ids.has(e.id)), ...events]);
-      calendar.notify(`Imported ${events.length} event${events.length === 1 ? '' : 's'}`);
+      calendar.notify(calendar.t('ical.imported', { n: events.length }));
       return events.length;
     }
 
@@ -175,7 +182,7 @@
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      calendar.notify(`Exported ${events.length} event${events.length === 1 ? '' : 's'} to ${filename}`);
+      calendar.notify(calendar.t('ical.exported', { n: events.length, file: filename }));
     }
 
     return {
@@ -195,7 +202,7 @@
           b.addEventListener('click', onClick);
           return b;
         };
-        if (exportButton) slot.append(button('export', 'Export to .ics', download));
+        if (exportButton) slot.append(button('export', calendar.t('ical.export'), download));
         if (importButton) {
           const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.ics,text/calendar', hidden: true });
           input.addEventListener('change', async () => {
@@ -203,7 +210,7 @@
             if (file) importText(await file.text());
             input.value = '';
           });
-          slot.append(input, button('import', 'Import an .ics file', () => input.click()));
+          slot.append(input, button('import', calendar.t('ical.import'), () => input.click()));
         }
       },
       toICS, parse, download, import: importText

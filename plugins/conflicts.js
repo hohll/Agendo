@@ -19,6 +19,13 @@
 .ago-conflict-mark { margin-left: 4px; font-weight: 700; color: #fff; background: #dc2626; border-radius: 999px; padding: 0 5px; font-size: 0.7em; }
 .ago-list-item.ago-conflict { outline-offset: -3px; }`;
 
+  // English texts; locales/*.js translate them (calendar.t, see Agendo.locales).
+  if (typeof Agendo !== 'undefined') Agendo.addLocale('en', {
+    'conflicts.overlaps': 'Overlaps {titles}',
+    'conflicts.bookedResource': '{resource} is already booked: "{title}" ({when})',
+    'conflicts.booked': 'This time is already booked: "{title}" ({when})'
+  });
+
   function conflicts({ by = 'resource', block = true, ignore = null } = {}) {
     const skip = ev => ev.display === 'background' || ev.display === 'inverse-background' || ev.holiday || (ignore && ignore(ev));
     const group = ev => (by === 'resource' ? ev.resourceId : 'all');
@@ -67,7 +74,7 @@
         el.classList.add('ago-conflict');
         const host = el.querySelector('.ago-event-title, .ago-mevent-title, .ago-list-title') ?? el;
         const mark = Object.assign(document.createElement('span'), { className: 'ago-conflict-mark', textContent: '⚠' });
-        mark.title = `Overlaps ${with_.join(', ')}`;
+        mark.title = calendar.t('conflicts.overlaps', { titles: with_.join(', ') });
         host.append(mark);
       },
 
@@ -84,8 +91,8 @@
         if (!other) return null;
         const t = d => d.toLocaleTimeString(calendar.o.locale, { hour: 'numeric', minute: '2-digit' });
         const res = by === 'resource' ? calendar.getResources().find(r => r.id === data.resourceId)?.title : null;
-        const when = other.allDay ? 'all day' : `${t(other.start)}–${t(other.end)}`;
-        return { start: `${res ? `${res} is` : 'This time is'} already booked: "${other.title}" (${when})` };
+        const when = other.allDay ? calendar.t('allDayList') : `${t(other.start)}–${t(other.end)}`;
+        return { start: calendar.t(res ? 'conflicts.bookedResource' : 'conflicts.booked', { resource: res, title: other.title, when }) };
       },
 
       // Ids of the events on screen that overlap another, with what they overlap.

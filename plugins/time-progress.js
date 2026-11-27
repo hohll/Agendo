@@ -18,11 +18,18 @@
 .ago-progress { position: absolute; left: 0; bottom: 0; height: 3px; width: var(--ago-progress); background: rgb(255 255 255 / 0.85); pointer-events: none; }
 .ago-remaining { margin-left: 4px; font-weight: 600; }`;
 
+  // English texts; locales/*.js translate them (calendar.t, see Agendo.locales).
+  if (typeof Agendo !== 'undefined') Agendo.addLocale('en', {
+    'timeProgress.minutes': '{n} min', 'timeProgress.hours': '{h} h', 'timeProgress.hoursMinutes': '{h} h {m}',
+    'timeProgress.endsIn': 'Ends in {time}', 'timeProgress.left': '· {time} left'
+  });
+
   function timeProgress({ dimPast = true, progress = true, every = 60000 } = {}) {
     let calendar, timer;
     const left = ms => {
       const min = Math.ceil(ms / 60000);
-      return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60}` : ''}`;
+      const h = Math.floor(min / 60), m = min % 60;
+      return calendar.t(min < 60 ? 'timeProgress.minutes' : m ? 'timeProgress.hoursMinutes' : 'timeProgress.hours', { n: min, h, m });
     };
     return {
       name: 'timeProgress',
@@ -38,13 +45,13 @@
         if (dimPast && ev.end <= now) { el.classList.add('ago-past'); return; }
         if (!progress || ev.start > now || ev.allDay) return;
         el.classList.add('ago-running');
-        el.title = `Ends in ${left(ev.end - now)}`;
+        el.title = calendar.t('timeProgress.endsIn', { time: left(ev.end - now) });
         if (view === 'list') return;
         const bar = Object.assign(document.createElement('div'), { className: 'ago-progress' });
         bar.style.setProperty('--ago-progress', `${Math.round(((now - ev.start) / (ev.end - ev.start)) * 100)}%`);
         el.append(bar);
         const time = el.querySelector('.ago-event-time');
-        if (time && view === 'timeGrid') time.append(Object.assign(document.createElement('span'), { className: 'ago-remaining', textContent: `· ${left(ev.end - now)} left` }));
+        if (time && view === 'timeGrid') time.append(Object.assign(document.createElement('span'), { className: 'ago-remaining', textContent: calendar.t('timeProgress.left', { time: left(ev.end - now) }) }));
       },
       destroy() { clearInterval(timer); }
     };

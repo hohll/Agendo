@@ -59,9 +59,13 @@
     }
   }
 
+  // English texts; locales/*.js translate them (calendar.t, see Agendo.locales).
+  if (typeof Agendo !== 'undefined') Agendo.addLocale('en', { 'eventDataModel.yes': 'Yes', 'eventDataModel.no': 'No' });
+
   // Text shown for a value (badge, popover).
-  function display(field, v, locale) {
-    if (field.type === 'checkbox') return v ? 'Yes' : 'No';
+  function display(field, v, calendar) {
+    const locale = calendar?.o.locale;
+    if (field.type === 'checkbox') return calendar ? calendar.t(v ? 'eventDataModel.yes' : 'eventDataModel.no') : v ? 'Yes' : 'No';
     if (field.type === 'select') return optionOf(field, v)?.label ?? String(v);
     if (field.type === 'date') {
       const d = new Date(`${v}T00:00`);
@@ -117,7 +121,7 @@
           const v = ev[f.name];
           if (!f.badge || v === undefined || v === false || v === '') continue;
           const text = typeof f.badge === 'function' ? f.badge(v, ev)
-            : typeof f.badge === 'string' ? f.badge : display(f, v, calendar?.o.locale);
+            : typeof f.badge === 'string' ? f.badge : display(f, v, calendar);
           if (!text) continue;
           const badge = Object.assign(document.createElement('span'), { className: 'ago-badge', textContent: text });
           const color = f.type === 'select' && optionOf(f, v)?.color;
@@ -133,7 +137,7 @@
           const v = ev[f.name];
           if (!f.popover || CORE_POPOVER.includes(f.name) || v === undefined || v === '') continue;
           rows.push(Object.assign(document.createElement('dt'), { textContent: f.label ?? f.name }),
-            Object.assign(document.createElement('dd'), { textContent: display(f, v, calendar?.o.locale) }));
+            Object.assign(document.createElement('dd'), { textContent: display(f, v, calendar) }));
         }
         if (!rows.length) return parts;
         let dl = parts.find(p => p.tagName === 'DL');

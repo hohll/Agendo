@@ -40,7 +40,7 @@ That project is itself inspired by and based on the classic [jquery-week-calenda
 - **Event Popover**: hovering an event shows a card with all its details; short events fit their title and time on one line.
 - **Smart Overlap Handling**: Automatically detects overlapping event clusters and arranges them side-by-side cleanly.
 - **Current Time Indicator**: Live red indicator line showing the current day and time, updating automatically.
-- **Native Localization**: Built-in 12-hour or 24-hour display using the standard `Intl.DateTimeFormat` API and browser locales.
+- **Languages**: every text of the calendar and its plugins follows `locale`, with packs for French, German, Spanish, Italian and Japanese in `locales/` (English is built in), plural forms from `Intl.PluralRules`, and a `labels` option to change any text. Dates, weekdays and months come from `Intl.DateTimeFormat`, with a 12-hour or 24-hour clock. See [Languages](#-languages).
 - **Built-in Event Modal**: HTML5 `<dialog>` form for creating, editing, and deleting events with keyboard and validation support.
 - **Business Hours**: Visual highlighting for configurable working hours.
 - **Responsive**: when the calendar itself is narrower than 640px (a phone, or a narrow column on a wide page: the calendar watches its own width, class `ago-narrow`), the toolbar gets compact, day headers show one letter ("M 23") and the hour column narrows.
@@ -118,7 +118,8 @@ const calendar = new Agendo('#calendar-container', {
 | `slotsPerHour` | `number` | `4` | Number of time slots per hour (`4` = 15-minute intervals). |
 | `slotHeight` | `number` | `24` | Height in pixels for each time slot. |
 | `use24Hour` | `boolean` | `false` | Whether to display hours in 24-hour military format. |
-| `locale` | `string` | `navigator.language` | BCP 47 language tag for date and time formatting. |
+| `locale` | `string` | `navigator.language` | BCP 47 language tag: dates and times, and the texts of the interface when a pack for that language is loaded (see [Languages](#-languages)). |
+| `labels` | `object \| null` | `null` | Texts that replace the locale's, by key: `{ today: 'Now', newEvent: 'New booking' }`. See [Languages](#-languages). |
 | `businessHours` | `object \| false` | `{ start: 9, end: 18 }` | Highlighted business hours or `false` to disable. |
 | `events` | `Array` | `[]` | Initial array of event objects. |
 | `readonly` | `boolean` | `false` | Disable all interaction (creating, moving, resizing, editing). |
@@ -130,7 +131,7 @@ const calendar = new Agendo('#calendar-container', {
 | `showCurrentTime` | `boolean` | `true` | Display the real-time indicator line. |
 | `timelineCustom` | `object \| null` | `null` | Enables the `'timeline-custom'` view: `{ days: 3, slotMinutes: 30, labelMinutes: 60, slotWidth: 24, label: '3 days' }` (slot size, time-label interval, slot width in px). Use `slotMinutes: 1440` for one slot per day. |
 | `theme` | `string \| null` | `null` | Theme name: adds the class `ago-theme-<name>` to the container (`'tabler'`, `'bootstrap'`, `'bulma'`, or your own). Load the matching stylesheet. |
-| `resourceLabel` | `string` | `'Resources'` | Header of the resource column in timeline views. |
+| `resourceLabel` | `string \| null` | `null` | Header of the resource column in timeline views; `null` shows the locale's "Resources". |
 | `enableAllDay` | `boolean` | `true` | *All day* checkbox in the event form and drag to create in the all-day row. When `false`, existing all-day events still show and stay all-day when edited. |
 | `enableRecurring` | `boolean` | `true` | *Repeat* section in the event form. When `false`, new events cannot repeat; existing recurring events still show, and changing an occurrence still asks this / following / all. |
 | `openEventOn` | `'click' \| 'dblclick'` | `'click'` | The gesture that opens an event (the edit dialog, or `onEventClick`), in every view. `'dblclick'` opens on a second click on the same event within 400 ms, which also works as a double tap on touch screens; a single click then does nothing, so events can be dragged without opening by mistake. |
@@ -341,6 +342,8 @@ Loaded values are given their type: `"12"` becomes `12` for a number, `"true"` b
 | `getViews()` | — | Returns the keys of the view buttons shown. |
 | `getPlugin(name)` | `string` | The plugin with that `name`, or `null`. |
 | `notify(message, ms?)` | `string, number` | Show a short message at the bottom of the calendar (default 3.5 s). |
+| `t(key, vars?)` | `string, Object` | A text of the interface in the calendar's language, placeholders filled from `vars` (see [Languages](#-languages)). |
+| `Agendo.addLocale(code, texts)` | `string, Object` | Add a language, or complete one (static). |
 | `redraw()` | — | Draw the events again. |
 | `getResources()` | — | Returns a shallow copy of the resources. |
 | `setResources(resources)` | `Array` | Replace the resource list and re-render. With an empty list, a resource or timeline view on screen switches to the first view shown. |
@@ -361,6 +364,40 @@ Loaded values are given their type: `"12"` becomes `12` for a number, `"true"` b
 | `openEditModal(event)` | `Object` | Manually trigger the "Edit Event" dialog. |
 | `setTheme(name)` | `string \| null` | Switch theme (`null` = default look). |
 | `destroy()` | — | Unbind timers, empty container, and clean up classes. |
+
+---
+
+## 🌍 Languages
+
+English is built in. Load a pack after `agendo.js` and set `locale`; the texts of the calendar and of the plugins (toolbar, views, event form, repeat rules, messages) follow it:
+
+```html
+<script src="agendo.js"></script>
+<script src="locales/fr.js"></script>   <!-- fr, de, es, it, ja -->
+<script>
+  new Agendo('#calendar', { locale: 'fr-FR' });
+</script>
+```
+
+A locale such as `'fr-CA'` uses a `fr-ca` pack if there is one, then `fr`, then English for any text left. Dates, weekdays and months always come from `Intl.DateTimeFormat` in that locale, so with no pack for a language the texts stay English while dates are in that language.
+
+**Change a few texts** with the `labels` option (it wins over every pack):
+
+```javascript
+new Agendo('#calendar', { locale: 'en-GB', labels: { newEvent: 'New booking', resources: 'Rooms' } });
+```
+
+**Add a language** with `Agendo.addLocale(code, texts)`; the keys are those of `Agendo.locales.en` in `agendo.js`, plus each plugin's own (`conflicts.*`, `eventDataModel.*`, `ical.*`, `restStorage.*`, `timeProgress.*`, registered by the plugin). A key left out falls back to English. A text is one of:
+
+- a string with `{placeholders}`: `dayOff: '{date} is a day off'`;
+- plural forms chosen by `Intl.PluralRules` for `{n}`: `more: { one: '+{n} more', other: '+{n} more' }` (`zero`, `two`, `few`, `many` too, as the language needs; `other` is the fallback);
+- a function `(vars) => string`, for grammar a template cannot do. `locales/it.js` uses one so the ordinal agrees with the weekday ("il primo lunedì", "la prima domenica"): `repeatMonthlyNth` and `ruleOnNth` get `n` (1–5, or -1 for the last) and `weekdayIndex` (0 = Sunday) besides `nth` and `weekday`.
+
+```javascript
+Agendo.addLocale('nl', { today: 'Vandaag', week: 'Week', more: '+{n} meer' /* … */ });
+```
+
+Plugins add their English texts with `Agendo.addLocale('en', { 'myPlugin.saved': 'Saved' })` and show them with `calendar.t('myPlugin.saved')`.
 
 ---
 

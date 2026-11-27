@@ -88,7 +88,8 @@ class Agendo {
     dialogExpand: false,    // true: the event form widens to two columns when its fields are taller than the window
     eventPopover: true,     // card with the event's details on mouse hover; false = none,
                             // or (event) => Node | string | null for your own content
-    resourceLabel: 'Resources',  // header of the resource column in timeline views
+    resourceLabel: null,    // header of the resource column in timeline views (null = the locale's "Resources")
+    labels: null,           // { key: text } replacing texts of the locale, see Agendo.locales.en for the keys
     colorScheme: null,      // 'light' | 'dark' | 'auto' (follows the OS) | null (light, or the page's framework theme)
     theme: null,            // e.g. 'tabler' | 'bootstrap' | 'bulma': adds class ago-theme-<name> (load themes/<name>.css)
     openEventOn: 'click',   // 'click' | 'dblclick': the gesture that opens an event (edit dialog or onEventClick)
@@ -101,6 +102,59 @@ class Agendo {
     onFilterChange: null,   // ({ calendars, categories }) => {} — ids still shown
     plugins: []             // [plugin, …]: objects of hooks, see "Plugins" in the README
   };
+
+  // Texts of the interface by language, picked from the `locale` option ('fr-CA' → 'fr-ca', then 'fr',
+  // then English). Other languages are in locales/*.js; Agendo.addLocale() adds or completes one.
+  // A text is a string with {placeholders}, an object of plural forms ({ one, other, … } chosen by
+  // Intl.PluralRules for {n}), or a function (vars) => string. Dates, weekdays and months come from Intl.
+  static locales = {
+    en: {
+      // Toolbar
+      today: 'Today', previous: 'Previous', next: 'Next',
+      day: 'Day', workweek: 'Workweek', week: 'Week', month: 'Month', year: 'Year',
+      list: 'List', resources: 'Resources', timeline: 'Timeline',
+      timelineDays: { one: '{n} day', other: '{n} days' },
+      filter: 'Filter', filterHidden: 'Filter ({n} hidden)', calendars: 'Calendars', categories: 'Categories',
+      // Views
+      allDayRow: 'all-day', allDayList: 'all day', titleAllDay: '{title} (all day)',
+      noEvents: 'No events to display', more: '+{n} more',
+      dayEvents: { one: '{date}, {n} event', other: '{date}, {n} events' },
+      weekNumber: 'Week {n}', weekShort: 'W{n}', repeats: 'Repeats',
+      // Popover and event form
+      allDay: 'All day', resource: 'Resource', calendar: 'Calendar', category: 'Category', location: 'Location',
+      newEvent: 'New Event', editEvent: 'Edit Event', close: 'Close',
+      title: 'Title', start: 'Start', end: 'End', repeat: 'Repeat',
+      repeatEvery: 'Repeat every', interval: 'Interval', unit: 'Unit',
+      unitDays: 'day(s)', unitWeeks: 'week(s)', unitMonths: 'month(s)', unitYears: 'year(s)',
+      onDays: 'On', ends: 'Ends', endsNever: 'Never', endsOn: 'On', endDate: 'End date',
+      endsAfter: 'After', occurrences: 'occurrences', occurrenceCount: 'Occurrences',
+      delete: 'Delete', cancel: 'Cancel', save: 'Save', ok: 'OK',
+      // Repeat choices, following the start date ({weekday}, {day}, {date}, {nth}, {n}: 1–5 or -1 for the last)
+      repeatNone: 'Does not repeat', repeatDaily: 'Daily', repeatWeekly: 'Weekly on {weekday}',
+      repeatWeekdays: 'Every weekday (Monday to Friday)', repeatMonthly: 'Monthly on day {day}',
+      repeatMonthlyNth: 'Monthly on the {nth} {weekday}', repeatYearly: 'Yearly on {date}', repeatCustom: 'Custom…',
+      nth1: 'first', nth2: 'second', nth3: 'third', nth4: 'fourth', nth5: 'fifth', nthLast: 'last',
+      // A rule in words: "Every 2 weeks on Monday and Wednesday, until 30 June 2027"
+      ruleDaily: 'Daily', ruleWeekly: 'Weekly', ruleMonthly: 'Monthly', ruleYearly: 'Yearly',
+      ruleEveryDays: 'Every {n} days', ruleEveryWeeks: 'Every {n} weeks',
+      ruleEveryMonths: 'Every {n} months', ruleEveryYears: 'Every {n} years',
+      ruleOnWeekdays: '{rule} on weekdays', ruleOnDays: '{rule} on {days}', ruleOnNth: '{rule} on the {nth} {weekday}',
+      ruleOnDay: '{rule} on day {day}', ruleOnDate: '{rule} on {date}', ruleUntil: '{rule}, until {date}',
+      ruleCount: { one: '{rule}, once', other: '{rule}, {n} times' },
+      // Recurring event: which occurrences a change applies to
+      scopeDelete: 'Delete recurring event', scopeEdit: 'Edit recurring event', scopeChange: 'Change recurring event',
+      scopeThis: 'This event', scopeFollowing: 'This and following events', scopeAll: 'All events',
+      // Messages
+      untitled: 'Untitled Event', endAfterStart: 'End must be after start',
+      noPast: 'Events cannot be moved into the past', dayOff: '{date} is a day off'
+    }
+  };
+
+  // Adds a language (code: 'fr', 'pt-BR'…) or completes one: plugins add their own English texts this way.
+  static addLocale(code, messages) {
+    const k = String(code).toLowerCase();
+    Agendo.locales[k] = { ...Agendo.locales[k], ...messages };
+  }
 
   constructor(container, options = {}) {
     this.el = typeof container === 'string' ? document.querySelector(container) : container;
@@ -164,6 +218,7 @@ class Agendo {
 
     // Weekday toggles of the custom repeat, in the calendar's week order.
     const sunday = new Date(2023, 0, 1);
+    const T = (key, vars) => esc(this.t(key, vars));
     const weekdays = Array.from({ length: 7 }, (_, i) => {
       const wd = (o.firstDayOfWeek + i) % 7, d = addDays(sunday, wd);
       return `<label title="${esc(this.fmt.weekdayLong.format(d))}"><input type="checkbox" name="byDay" value="${WD[wd]}">` +
@@ -173,50 +228,50 @@ class Agendo {
     this.el.innerHTML = `
       <div class="ago-toolbar">
         <div class="ago-group">
-          <button type="button" class="ago-btn" data-action="today">Today</button>
-          <button type="button" class="ago-btn" data-action="prev" title="Previous">&larr;</button>
-          <button type="button" class="ago-btn" data-action="next" title="Next">&rarr;</button>
+          <button type="button" class="ago-btn" data-action="today">${T('today')}</button>
+          <button type="button" class="ago-btn" data-action="prev" title="${T('previous')}" aria-label="${T('previous')}">&larr;</button>
+          <button type="button" class="ago-btn" data-action="next" title="${T('next')}" aria-label="${T('next')}">&rarr;</button>
         </div>
         <div class="ago-title"></div>
         <div class="ago-tools">
         <div class="ago-views">
           <div class="ago-group">
-            <button type="button" class="ago-btn" data-days="1">Day</button>
-            <button type="button" class="ago-btn" data-days="5">Workweek</button>
-            <button type="button" class="ago-btn" data-days="7">Week</button>
-            <button type="button" class="ago-btn" data-days="month">Month</button>
-            <button type="button" class="ago-btn" data-days="year">Year</button>
+            <button type="button" class="ago-btn" data-days="1">${T('day')}</button>
+            <button type="button" class="ago-btn" data-days="5">${T('workweek')}</button>
+            <button type="button" class="ago-btn" data-days="7">${T('week')}</button>
+            <button type="button" class="ago-btn" data-days="month">${T('month')}</button>
+            <button type="button" class="ago-btn" data-days="year">${T('year')}</button>
             <details class="ago-dropdown">
-              <summary class="ago-btn" data-label="List">List</summary>
+              <summary class="ago-btn" data-label="${T('list')}">${T('list')}</summary>
               <div class="ago-menu">
-                <button type="button" data-days="list-day">Day</button>
-                <button type="button" data-days="list-week">Week</button>
-                <button type="button" data-days="list-month">Month</button>
+                <button type="button" data-days="list-day">${T('day')}</button>
+                <button type="button" data-days="list-week">${T('week')}</button>
+                <button type="button" data-days="list-month">${T('month')}</button>
               </div>
             </details>
           </div>
           <div class="ago-group">
             <details class="ago-dropdown">
-              <summary class="ago-btn" data-label="Resources">Resources</summary>
+              <summary class="ago-btn" data-label="${T('resources')}">${T('resources')}</summary>
               <div class="ago-menu">
-                <button type="button" data-days="resource-day">Day</button>
-                <button type="button" data-days="resource-workweek">Workweek</button>
-                <button type="button" data-days="resource-week">Week</button>
+                <button type="button" data-days="resource-day">${T('day')}</button>
+                <button type="button" data-days="resource-workweek">${T('workweek')}</button>
+                <button type="button" data-days="resource-week">${T('week')}</button>
               </div>
             </details>
             <details class="ago-dropdown">
-              <summary class="ago-btn" data-label="Timeline">Timeline</summary>
+              <summary class="ago-btn" data-label="${T('timeline')}">${T('timeline')}</summary>
               <div class="ago-menu">
-                <button type="button" data-days="timeline-day">Day</button>
-                <button type="button" data-days="timeline-week">Week</button>
-                <button type="button" data-days="timeline-month">Month</button>
+                <button type="button" data-days="timeline-day">${T('day')}</button>
+                <button type="button" data-days="timeline-week">${T('week')}</button>
+                <button type="button" data-days="timeline-month">${T('month')}</button>
                 <button type="button" data-days="timeline-custom"></button>
               </div>
             </details>
           </div>
         </div>
         <details class="ago-dropdown ago-filter">
-          <summary class="ago-btn">Filter</summary>
+          <summary class="ago-btn">${T('filter')}</summary>
           <div class="ago-menu"></div>
         </details>
         <div class="ago-group ago-plugin-tools"></div>
@@ -226,14 +281,14 @@ class Agendo {
       <div class="ago-grid"></div>
       <dialog class="ago-dialog">
         <form method="dialog">
-          <header><span class="ago-dialog-title"></span><button value="cancel" formnovalidate>&times;</button></header>
+          <header><span class="ago-dialog-title"></span><button value="cancel" formnovalidate aria-label="${T('close')}" title="${T('close')}">&times;</button></header>
           <div class="ago-dialog-body">
-          <label data-field="title">Title <input name="title" required></label>
-          <label class="ago-check" data-field="allDay"><input type="checkbox" name="allDay"> All day</label>
-          <label data-field="start">Start <input name="start" type="datetime-local" required></label>
-          <label data-field="end">End <input name="end" type="datetime-local" required></label>
+          <label data-field="title">${T('title')} <input name="title" required></label>
+          <label class="ago-check" data-field="allDay"><input type="checkbox" name="allDay"> ${T('allDay')}</label>
+          <label data-field="start">${T('start')} <input name="start" type="datetime-local" required></label>
+          <label data-field="end">${T('end')} <input name="end" type="datetime-local" required></label>
           <div class="ago-repeat" data-repeat data-field="repeat">
-            <label>Repeat
+            <label>${T('repeat')}
               <select name="repeat">
                 <option value="none"></option><option value="daily"></option><option value="weekly"></option>
                 <option value="weekdays"></option><option value="monthly"></option><option value="monthlyNth"></option>
@@ -241,33 +296,33 @@ class Agendo {
               </select>
             </label>
             <fieldset data-custom>
-              <legend>Repeat every</legend>
+              <legend>${T('repeatEvery')}</legend>
               <div class="ago-inline">
-                <input name="interval" type="number" min="1" max="99" value="1" aria-label="Interval">
-                <select name="freq" aria-label="Unit">
-                  <option value="daily">day(s)</option><option value="weekly">week(s)</option>
-                  <option value="monthly">month(s)</option><option value="yearly">year(s)</option>
+                <input name="interval" type="number" min="1" max="99" value="1" aria-label="${T('interval')}">
+                <select name="freq" aria-label="${T('unit')}">
+                  <option value="daily">${T('unitDays')}</option><option value="weekly">${T('unitWeeks')}</option>
+                  <option value="monthly">${T('unitMonths')}</option><option value="yearly">${T('unitYears')}</option>
                 </select>
               </div>
-              <div class="ago-weekdays" data-weekdays role="group" aria-label="On">${weekdays}</div>
+              <div class="ago-weekdays" data-weekdays role="group" aria-label="${T('onDays')}">${weekdays}</div>
             </fieldset>
             <fieldset data-ends>
-              <legend>Ends</legend>
-              <label class="ago-check"><input type="radio" name="ends" value="never" checked> Never</label>
-              <label class="ago-check"><input type="radio" name="ends" value="until"> On
-                <input type="date" name="until" aria-label="End date"></label>
-              <label class="ago-check"><input type="radio" name="ends" value="count"> After
-                <input type="number" name="count" min="1" max="999" value="10" aria-label="Occurrences"> occurrences</label>
+              <legend>${T('ends')}</legend>
+              <label class="ago-check"><input type="radio" name="ends" value="never" checked> ${T('endsNever')}</label>
+              <label class="ago-check"><input type="radio" name="ends" value="until"> ${T('endsOn')}
+                <input type="date" name="until" aria-label="${T('endDate')}"></label>
+              <label class="ago-check"><input type="radio" name="ends" value="count"> ${T('endsAfter')}
+                <input type="number" name="count" min="1" max="999" value="10" aria-label="${T('occurrenceCount')}"> ${T('occurrences')}</label>
             </fieldset>
           </div>
-          <label data-res-field data-field="resource">Resource <select name="resourceId"></select></label>
-          <label data-cal-field data-field="calendar">Calendar <select name="calendarId"></select></label>
-          <label data-cat-field data-field="category">Category <select name="categoryId"></select></label>
+          <label data-res-field data-field="resource">${T('resource')} <select name="resourceId"></select></label>
+          <label data-cal-field data-field="calendar">${T('calendar')} <select name="calendarId"></select></label>
+          <label data-cat-field data-field="category">${T('category')} <select name="categoryId"></select></label>
           </div>
           <footer>
-            <button class="ago-btn ago-btn-danger" value="delete" formnovalidate>Delete</button>
-            <button class="ago-btn" value="cancel" formnovalidate>Cancel</button>
-            <button class="ago-btn ago-btn-primary" value="save">Save</button>
+            <button class="ago-btn ago-btn-danger" value="delete" formnovalidate>${T('delete')}</button>
+            <button class="ago-btn" value="cancel" formnovalidate>${T('cancel')}</button>
+            <button class="ago-btn ago-btn-primary" value="save">${T('save')}</button>
           </footer>
         </form>
       </dialog>
@@ -275,13 +330,13 @@ class Agendo {
         <form method="dialog">
           <header><span class="ago-dialog-title"></span></header>
           <div class="ago-scope-list">
-            <label class="ago-check" data-scope-this><input type="radio" name="scope" value="this" checked> This event</label>
-            <label class="ago-check"><input type="radio" name="scope" value="following"> This and following events</label>
-            <label class="ago-check" data-scope-all><input type="radio" name="scope" value="all"> All events</label>
+            <label class="ago-check" data-scope-this><input type="radio" name="scope" value="this" checked> ${T('scopeThis')}</label>
+            <label class="ago-check"><input type="radio" name="scope" value="following"> ${T('scopeFollowing')}</label>
+            <label class="ago-check" data-scope-all><input type="radio" name="scope" value="all"> ${T('scopeAll')}</label>
           </div>
           <footer>
-            <button class="ago-btn" value="cancel" formnovalidate>Cancel</button>
-            <button class="ago-btn ago-btn-primary" value="ok">OK</button>
+            <button class="ago-btn" value="cancel" formnovalidate>${T('cancel')}</button>
+            <button class="ago-btn ago-btn-primary" value="ok">${T('ok')}</button>
           </footer>
         </form>
       </dialog>
@@ -357,7 +412,7 @@ class Agendo {
     const f = this.form.elements;
     this._checkRange = () => {
       const { start: s, end: e } = this._readDates();
-      f.end.setCustomValidity(e > s ? '' : 'End must be after start');
+      f.end.setCustomValidity(e > s ? '' : this.t('endAfterStart'));
     };
     f.start.addEventListener('input', () => { this._checkRange(); this._repeatLabels(); });
     f.end.addEventListener('input', this._checkRange);
@@ -462,7 +517,7 @@ class Agendo {
     else head = `<div class="ago-corner" style="grid-row: span 2">${wk}</div>` + days.map(dayHead).join('') +
       this.colRes.map(resHead).join('');   // dates above resources
 
-    if (this.o.allDaySlot) head += '<div class="ago-allday-label">all-day</div><div class="ago-allday"></div>';
+    if (this.o.allDaySlot) head += `<div class="ago-allday-label">${esc(this.t('allDayRow'))}</div><div class="ago-allday"></div>`;
 
     this.grid.style.setProperty('--ago-days', this.dates.length);
     this.grid.style.setProperty('--ago-col-min', grouped && n > 1 ? '70px' : '0px');
@@ -554,7 +609,7 @@ class Agendo {
     }).forEach(([k, v]) => this.grid.style.setProperty(k, v));
 
     this.grid.innerHTML =
-      `<div class="ago-tl-corner">${t.days === 1 && this.o.weekNumbers ? this._weekLabel(t.first) : ''}<span>${esc(this.o.resourceLabel)}</span></div><div class="ago-tl-head">${head}</div>` +
+      `<div class="ago-tl-corner">${t.days === 1 && this.o.weekNumbers ? this._weekLabel(t.first) : ''}<span>${esc(this.o.resourceLabel ?? this.t('resources'))}</span></div><div class="ago-tl-head">${head}</div>` +
       this.resources.map((r, i) => `
         <div class="ago-tl-res" title="${esc(r.title)}">
           ${r.color ? `<span class="ago-res-dot" style="background:${esc(r.color)}"></span>` : ''}${esc(r.title)}
@@ -617,7 +672,7 @@ class Agendo {
         box(el, s, e);
         el.style.top = `calc(${lane} * var(--ago-lane-h) + 3px)`;
         el.style.setProperty('--ago-ev', this._colorOf(ev));
-        if (!this.o.eventPopover) el.title = ev.allDay ? `${ev.title} (all day)` : `${this.fmt.time.format(ev.start)} – ${this.fmt.time.format(ev.end)} ${ev.title}`;
+        if (!this.o.eventPopover) el.title = ev.allDay ? this.t('titleAllDay', { title: ev.title }) : `${this.fmt.time.format(ev.start)} – ${this.fmt.time.format(ev.end)} ${ev.title}`;
         if (handles && this._canEdit(ev)) {
           el.append(div('ago-handle'), div('ago-handle'));
           el.children[0].dataset.edge = 'start';
@@ -793,7 +848,7 @@ class Agendo {
         // day of a multi-day event, "all day" in between or for a whole-day event.
         const startsHere = ev.start >= day, endsHere = ev.end < next;
         const fromMidnight = +ev.start <= +day, toMidnight = +ev.end >= +next;
-        const time = fromMidnight && toMidnight ? 'all day'
+        const time = fromMidnight && toMidnight ? this.t('allDayList')
           : startsHere && endsHere ? (ev.end > ev.start ? `${t(ev.start)} – ${t(ev.end)}` : t(ev.start))
           : startsHere ? `${t(ev.start)} –`
           : `– ${t(ev.end)}`;
@@ -807,7 +862,7 @@ class Agendo {
         parts.push(row);
       }
     });
-    this.grid.replaceChildren(...(parts.length ? parts : [div('ago-list-empty', 'No events to display')]));
+    this.grid.replaceChildren(...(parts.length ? parts : [div('ago-list-empty', this.t('noEvents'))]));
   }
 
   // --- Year: twelve mini months; days with events carry coloured dots ---
@@ -832,7 +887,8 @@ class Agendo {
         // Week number at the start of each row (the 1st's row starts with empty cells).
         if (wn && (d === 1 || (lead + d - 1) % 7 === 0)) {
           const n = this._weekNumber(date);
-          const btn = `<button type="button" class="ago-ywk" data-week="${i}" title="Week ${n}" aria-label="Week ${n}">${n}</button>`;
+          const wk = esc(this.t('weekNumber', { n }));
+          const btn = `<button type="button" class="ago-ywk" data-week="${i}" title="${wk}" aria-label="${wk}">${n}</button>`;
           cells = d === 1 ? btn + cells : cells + btn;
         }
         cells += `<button type="button" class="ago-yday${sameDay(date, now) ? ' ago-today' : ''}${this._isDayOff(date) ? ' ago-day-off' : ''}" data-goto="${i}">` +
@@ -872,7 +928,7 @@ class Agendo {
       }));
       const label = this.fmt.dayLong.format(this.dates[i]);
       el.title = items.length ? items.map(ev => ev.title).join('\n') : '';
-      el.setAttribute('aria-label', items.length ? `${label}, ${items.length} event${items.length > 1 ? 's' : ''}` : label);
+      el.setAttribute('aria-label', items.length ? this.t('dayEvents', { date: label, n: items.length }) : label);
     });
   }
 
@@ -962,8 +1018,8 @@ class Agendo {
   _title(ev, className, tag = 'div') {
     const el = Object.assign(document.createElement(tag), { className, textContent: ev.title });
     if (ev.recurringId) {
-      const icon = Object.assign(document.createElement('span'), { className: 'ago-rec', textContent: '↻', title: 'Repeats' });
-      icon.setAttribute('aria-label', 'Repeats');
+      const icon = Object.assign(document.createElement('span'), { className: 'ago-rec', textContent: '↻', title: this.t('repeats') });
+      icon.setAttribute('aria-label', icon.title);
       el.prepend(icon);
     }
     return el;
@@ -995,7 +1051,8 @@ class Agendo {
     const wkCell = i => {
       if (!wn || i % 7) return '';
       const n = this._weekNumber(this.dates[i]);
-      return `<button type="button" class="ago-wk-cell" data-week="${i}" title="Week ${n}" aria-label="Week ${n}">${n}</button>`;
+      const wk = esc(this.t('weekNumber', { n }));
+      return `<button type="button" class="ago-wk-cell" data-week="${i}" title="${wk}" aria-label="${wk}">${n}</button>`;
     };
     this.grid.innerHTML =
       (wn ? '<div class="ago-month-head ago-col0 ago-wk-head"></div>' : '') +
@@ -1043,7 +1100,7 @@ class Agendo {
       });
       if (shown.length < items.length) {
         els.push(Object.assign(document.createElement('button'), {
-          type: 'button', className: 'ago-more', textContent: `+${items.length - shown.length} more`
+          type: 'button', className: 'ago-more', textContent: this.t('more', { n: items.length - shown.length })
         }));
         els.at(-1).dataset.goto = i;
       }
@@ -1156,7 +1213,7 @@ class Agendo {
       const el = div('ago-event ago-ad-event' + (this.drag?.event === ev ? ' is-dragging' : '') +
         (ev.start < this.dates[a] ? ' ago-clip-start' : '') + (ev.end > addDays(this.dates[b], 1) ? ' ago-clip-end' : ''));
       el.dataset.id = ev.id;
-      if (!this.o.eventPopover) el.title = `${ev.title} (all day)`;
+      if (!this.o.eventPopover) el.title = this.t('titleAllDay', { title: ev.title });
       el.style.setProperty('--ago-ev', this._colorOf(ev));
       pos(el, a, b, lane);
       if (handles && this._canEdit(ev)) {
@@ -1469,7 +1526,7 @@ class Agendo {
 
   _weekLabel(date) {
     const n = this._weekNumber(date);
-    return `<span class="ago-weeknum" title="Week ${n}">W${n}</span>`;
+    return `<span class="ago-weeknum" title="${esc(this.t('weekNumber', { n }))}">${esc(this.t('weekShort', { n }))}</span>`;
   }
 
   _weekStart(date) {
@@ -1539,7 +1596,7 @@ class Agendo {
     let when;
     if (ev.allDay) {
       const last = addDays(ev.end, -1);
-      when = [sameDay(ev.start, last) ? f.dayLong.format(ev.start) : f.range.formatRange(ev.start, last), 'All day'];
+      when = [sameDay(ev.start, last) ? f.dayLong.format(ev.start) : f.range.formatRange(ev.start, last), this.t('allDay')];
     } else if (sameDay(ev.start, ev.end) || +ev.end === +addDays(atMinutes(ev.start, 0), 1)) {
       when = [f.dayLong.format(ev.start), `${t(ev.start)} – ${t(ev.end)}`];
     } else {
@@ -1560,11 +1617,11 @@ class Agendo {
       dd.append(item.title);
       rows.push(Object.assign(document.createElement('dt'), { textContent: label }), dd);
     };
-    add('Resource', this.resources, ev.resourceId);
-    add('Calendar', this.calendars, ev.calendarId);
-    add('Category', this.categories, ev.categoryId);
+    add(this.t('resource'), this.resources, ev.resourceId);
+    add(this.t('calendar'), this.calendars, ev.calendarId);
+    add(this.t('category'), this.categories, ev.categoryId);
     if (ev.location) {
-      rows.push(Object.assign(document.createElement('dt'), { textContent: 'Location' }),
+      rows.push(Object.assign(document.createElement('dt'), { textContent: this.t('location') }),
         Object.assign(document.createElement('dd'), { textContent: ev.location }));
     }
     if (rows.length) {
@@ -1576,23 +1633,39 @@ class Agendo {
     return parts;
   }
 
-  // "Weekly on Monday, Wednesday", "Every 2 months on the last Friday, until 30 June 2027"…
+  // "Weekly on Monday and Wednesday", "Every 2 months on the last Friday, until 30 June 2027"…
   _describeRule(r, start) {
-    const f = this.fmt, iv = r.interval || 1;
+    const f = this.fmt, iv = r.interval || 1, t = (k, v) => this.t(k, v);
     const name = code => f.weekdayLong.format(addDays(new Date(2023, 0, 1), WD.indexOf(code)));   // 1 Jan 2023 = Sunday
-    const ordinal = n => (n < 0 ? 'last' : ['first', 'second', 'third', 'fourth', 'fifth'][n - 1]);
-    const units = { daily: 'days', weekly: 'weeks', monthly: 'months', yearly: 'years' };
-    let s = iv === 1 ? { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' }[r.freq] : `Every ${iv} ${units[r.freq]}`;
+    const unit = { daily: 'Days', weekly: 'Weeks', monthly: 'Months', yearly: 'Years' }[r.freq];
+    const base = { daily: 'ruleDaily', weekly: 'ruleWeekly', monthly: 'ruleMonthly', yearly: 'ruleYearly' }[r.freq];
+    let rule = iv === 1 ? t(base) : t(`ruleEvery${unit}`, { n: iv });
     if (r.freq === 'weekly') {
       const days = r.byDay ?? [WD[start.getDay()]];
-      s += days.join(',') === 'MO,TU,WE,TH,FR' ? ' on weekdays' : ` on ${days.map(c => name(c.slice(-2))).join(', ')}`;
+      rule = days.join(',') === 'MO,TU,WE,TH,FR' ? t('ruleOnWeekdays', { rule })
+        : t('ruleOnDays', { rule, days: this._list(days.map(c => name(c.slice(-2)))) });
     } else if (r.freq === 'monthly') {
       const nth = r.byDay?.find(c => parseInt(c, 10));
-      s += nth ? ` on the ${ordinal(parseInt(nth, 10))} ${name(nth.slice(-2))}` : ` on day ${start.getDate()}`;
-    } else if (r.freq === 'yearly') s += ` on ${f.dayMonth.format(start)}`;
-    if (r.until) s += `, until ${f.range.format(parseDay(r.until))}`;
-    else if (r.count) s += `, ${r.count} times`;
-    return s;
+      rule = nth ? t('ruleOnNth', { rule, ...this._nth(parseInt(nth, 10), WD.indexOf(nth.slice(-2))) })
+        : t('ruleOnDay', { rule, day: start.getDate() });
+    } else if (r.freq === 'yearly') rule = t('ruleOnDate', { rule, date: f.dayMonth.format(start) });
+    if (r.until) rule = t('ruleUntil', { rule, date: f.range.format(parseDay(r.until)) });
+    else if (r.count) rule = t('ruleCount', { rule, n: r.count });
+    return rule;
+  }
+
+  // The words for "the {nth} {weekday}" of a month: n = 1…5, or -1 for the last; wd = 0 (Sunday) … 6.
+  // weekdayIndex and n let a language agree its ordinal with the weekday (a function text).
+  _nth(n, wd) {
+    return {
+      nth: this.t(n < 0 ? 'nthLast' : `nth${n}`), n, weekdayIndex: wd,
+      weekday: this.fmt.weekdayLong.format(addDays(new Date(2023, 0, 1), wd))
+    };
+  }
+
+  // "Monday, Tuesday and Friday", in the calendar's language.
+  _list(items) {
+    try { return new Intl.ListFormat(this.o.locale, { type: 'conjunction' }).format(items); } catch { return items.join(', '); }
   }
 
   _openDialog(title, event, start, end, resourceId, allDay = false) {
@@ -1747,7 +1820,7 @@ class Agendo {
     if (off) errors.start = this._dayOffMessage(off);
     // editPastEvents: false — an event cannot be moved or changed so that it ends in the past.
     if (!this.o.editPastEvents && event && !isBg(event) && !this._sameDates(data, event) && toDate(data.end) <= new Date()) {
-      errors.start = 'Events cannot be moved into the past';
+      errors.start = this.t('noPast');
     }
     return errors;
   }
@@ -1763,7 +1836,7 @@ class Agendo {
   openCreateModal(start, end, resourceId, allDay = false) {
     const off = this._dayOffIn(start, end);
     if (off) return this.notify(this._dayOffMessage(off));
-    this._openDialog('New Event', null, start, end, resourceId, allDay);
+    this._openDialog(this.t('newEvent'), null, start, end, resourceId, allDay);
   }
 
   // --- Days off (daysOff option): no event can be added there ---
@@ -1827,8 +1900,8 @@ class Agendo {
     return m(a.start) === m(b.start) && m(a.end) === m(b.end);
   }
 
-  _dayOffMessage(d) { return `${this.fmt.dayLong.format(d)} is a day off`; }
-  openEditModal(event) { this._openDialog('Edit Event', event, event.start, event.end); }
+  _dayOffMessage(d) { return this.t('dayOff', { date: this.fmt.dayLong.format(d) }); }
+  openEditModal(event) { this._openDialog(this.t('editEvent'), event, event.start, event.end); }
 
   // All-day events show their dates, the end date included (stored exclusive, as in iCalendar).
   _setDateInputs(allDay, start, end) {
@@ -1870,12 +1943,12 @@ class Agendo {
   _repeatLabels() {
     const f = this.form.elements, d = this._readDates().start;
     if (isNaN(d)) return;
-    const wd = this.fmt.weekdayLong.format(d), n = Math.ceil(d.getDate() / 7);
-    const ord = n > 4 ? 'last' : ['first', 'second', 'third', 'fourth'][n - 1];
+    const weekday = this.fmt.weekdayLong.format(d), n = Math.ceil(d.getDate() / 7), t = (k, v) => this.t(k, v);
     const text = {
-      none: 'Does not repeat', daily: 'Daily', weekly: `Weekly on ${wd}`,
-      weekdays: 'Every weekday (Monday to Friday)', monthly: `Monthly on day ${d.getDate()}`,
-      monthlyNth: `Monthly on the ${ord} ${wd}`, yearly: `Yearly on ${this.fmt.dayMonth.format(d)}`, custom: 'Custom…'
+      none: t('repeatNone'), daily: t('repeatDaily'), weekly: t('repeatWeekly', { weekday }),
+      weekdays: t('repeatWeekdays'), monthly: t('repeatMonthly', { day: d.getDate() }),
+      monthlyNth: t('repeatMonthlyNth', this._nth(n > 4 ? -1 : n, d.getDay())),
+      yearly: t('repeatYearly', { date: this.fmt.dayMonth.format(d) }), custom: t('repeatCustom')
     };
     for (const opt of f.repeat.options) opt.textContent = text[opt.value];
   }
@@ -1954,7 +2027,7 @@ class Agendo {
     switch (e.submitter?.value) {
       case 'delete':
         if (ev.recurringId) {
-          this._askScope('Delete recurring event', true, this._allScopeAllowed(ev)).then(scope => scope && this._deleteScoped(ev, scope));
+          this._askScope(this.t('scopeDelete'), true, this._allScopeAllowed(ev)).then(scope => scope && this._deleteScoped(ev, scope));
         } else {
           this.deleteEvent(ev.id);
           this._emitDelete(ev.id);
@@ -1989,7 +2062,7 @@ class Agendo {
         } else {
           const changed = this._ruleTouched && Agendo.toRRule(rule) !== Agendo.toRRule(ev.recurrence);
           const changes = changed ? { ...data, recurrence: rule } : data;
-          this._askScope('Edit recurring event', !changed, this._allScopeAllowed(ev)).then(scope =>
+          this._askScope(this.t('scopeEdit'), !changed, this._allScopeAllowed(ev)).then(scope =>
             scope && this._scopeAllowed(ev, changes, scope, 'edit') && this._applyScoped(ev, changes, scope, 'edit'));
         }
       }
@@ -2030,7 +2103,7 @@ class Agendo {
   }
 
   async _commitOccurrence(occ, changes, action, revert) {
-    const scope = await this._askScope('Change recurring event', true, this._allScopeAllowed(occ));
+    const scope = await this._askScope(this.t('scopeChange'), true, this._allScopeAllowed(occ));
     if (scope && this._scopeAllowed(occ, changes, scope, action)) return this._applyScoped(occ, changes, scope, action);
     revert?.();
     this._renderEvents();
@@ -2143,7 +2216,7 @@ class Agendo {
     this.resources = (resources || []).map(r => ({ ...r, id: String(r.id), title: r.title ?? String(r.id) }));
     this.el.querySelector('[data-res-field]').hidden = !this.resources.length;
     const custom = this.el.querySelector('[data-days="timeline-custom"]'), c = this.o.timelineCustom;
-    custom.textContent = c?.label ?? `${c?.days ?? 3} days`;
+    custom.textContent = c?.label ?? this.t('timelineDays', { n: c?.days ?? 3 });
     this.form.elements.resourceId.innerHTML = '<option value="">—</option>' +
       this.resources.map(r => `<option value="${esc(r.id)}">${esc(r.title)}</option>`).join('');
     this._applyViews();
@@ -2231,7 +2304,7 @@ class Agendo {
       list.map(x => `<label><input type="checkbox" value="${esc(x.id)}">${dot(x)}${esc(x.title)}</label>`).join('')}</fieldset>` : '';
     const menu = this.el.querySelector('.ago-filter');
     menu.hidden = !this.calendars.length && !this.categories.length;
-    menu.lastElementChild.innerHTML = section(this.calendars, 'calendar', 'Calendars') + section(this.categories, 'category', 'Categories');
+    menu.lastElementChild.innerHTML = section(this.calendars, 'calendar', esc(this.t('calendars'))) + section(this.categories, 'category', esc(this.t('categories')));
     this._syncFilterMenu();
 
     const opts = list => '<option value="">—</option>' +
@@ -2252,7 +2325,7 @@ class Agendo {
     const off = this.hidden.calendar.size + this.hidden.category.size;
     const sum = menu.querySelector('summary');
     sum.classList.toggle('active', off > 0);
-    sum.textContent = off ? `Filter (${off} hidden)` : 'Filter';
+    sum.textContent = off ? this.t('filterHidden', { n: off }) : this.t('filter');
   }
 
   // The events as stored: a recurring event once, with its `recurrence`.
@@ -2357,6 +2430,20 @@ class Agendo {
   redraw() { this._changed(); }
 
   // A short message at the bottom of the calendar (refused drop, import result…).
+  // A text of the interface in the calendar's language, with its {placeholders} filled from `vars`
+  // ({ n } also picks the plural form). Looks in the labels option, the locale ('fr-ca'), its language
+  // ('fr'), then English; an unknown key comes back as is. Plugins use it for their own texts.
+  t(key, vars = {}) {
+    const L = Agendo.locales, tag = String(this.o.locale || 'en').toLowerCase();
+    let m = this.o.labels?.[key] ?? L[tag]?.[key] ?? L[tag.split('-')[0]]?.[key] ?? L.en[key] ?? key;
+    if (typeof m === 'function') return String(m(vars));
+    if (m && typeof m === 'object') {
+      try { this._plural ??= new Intl.PluralRules(this.o.locale); } catch { this._plural = new Intl.PluralRules('en'); }
+      m = m[this._plural.select(vars.n ?? 0)] ?? m.other;
+    }
+    return String(m).replace(/\{(\w+)\}/g, (all, k) => (vars[k] !== undefined ? vars[k] : all));
+  }
+
   notify(message, ms = 3500) {
     const el = this.el.querySelector('.ago-toast');
     el.textContent = message;
@@ -2380,7 +2467,7 @@ class Agendo {
 
   // Dates parsed (a 'YYYY-MM-DD' string is a local date). An all-day event runs from midnight to
   // midnight, its end exclusive; a missing or too early end makes it one day long.
-  static _normalize(evt) {
+  static _normalize(evt, untitled = 'Untitled Event') {
     const allDay = !!evt.allDay;
     let start = toDate(evt.start), end = evt.end == null ? null : toDate(evt.end);
     if (allDay) {
@@ -2394,7 +2481,7 @@ class Agendo {
       resourceId: evt.resourceId == null ? undefined : String(evt.resourceId),
       calendarId: evt.calendarId == null ? undefined : String(evt.calendarId),
       categoryId: evt.categoryId == null ? undefined : String(evt.categoryId),
-      title: evt.title || (isBg(evt) ? '' : 'Untitled Event'),
+      title: evt.title || (isBg(evt) ? '' : untitled),
       allDay,
       start,
       end
@@ -2408,7 +2495,7 @@ class Agendo {
 
   // Core normalisation, then the plugins' normalizeEvent hooks.
   _norm(raw) {
-    return this._pipe('normalizeEvent', Agendo._normalize(raw), raw);
+    return this._pipe('normalizeEvent', Agendo._normalize(raw, this.t('untitled')), raw);
   }
 
   // Replaces `target`'s fields in place (an event object keeps its identity).
