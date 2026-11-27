@@ -277,7 +277,7 @@ class Agendo {
           <div class="ago-scope-list">
             <label class="ago-check" data-scope-this><input type="radio" name="scope" value="this" checked> This event</label>
             <label class="ago-check"><input type="radio" name="scope" value="following"> This and following events</label>
-            <label class="ago-check"><input type="radio" name="scope" value="all"> All events</label>
+            <label class="ago-check" data-scope-all><input type="radio" name="scope" value="all"> All events</label>
           </div>
           <footer>
             <button class="ago-btn" value="cancel" formnovalidate>Cancel</button>
@@ -684,7 +684,7 @@ class Agendo {
 
   _onTlMove(e, force = false) {
     const d = this.drag, dx = e.clientX - d.x;
-    if (!this._canEdit(d.event) && d.mode !== 'create') return;
+    if (!this._canEdit(d.orig ? { ...d.event, ...d.orig } : d.event) && d.mode !== 'create') return;   // d.event is being moved: judge the original
     if (!d.moved && !force && Math.hypot(dx, e.clientY - d.y) < 4) return;
     d.moved = !force || d.moved;
 
@@ -1215,7 +1215,7 @@ class Agendo {
 
   _onAdMove(e, force = false) {
     const d = this.drag;
-    if (!this._canEdit(d.event) && d.mode !== 'create') return;
+    if (!this._canEdit(d.orig ? { ...d.event, ...d.orig } : d.event) && d.mode !== 'create') return;   // d.event is being moved: judge the original
     if (!d.moved && !force && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 4) return;
     d.moved = !force || d.moved;
     const ev = d.event, c = this._adCol(e.clientX, d.rect), D = this.dates;
@@ -1317,7 +1317,7 @@ class Agendo {
     if (d.mode === 'month') return this._onMonthMove(e);
     if (d.tl) return this._onTlMove(e);
     if (d.ad) return this._onAdMove(e);
-    if (!this._canEdit(d.event) && d.mode !== 'create') return;
+    if (!this._canEdit(d.orig ? { ...d.event, ...d.orig } : d.event) && d.mode !== 'create') return;   // d.event is being moved: judge the original
     const dx = e.clientX - d.x, dy = e.clientY - d.y;
     if (!d.moved && !force && Math.hypot(dx, dy) < 4) return;
     d.moved = !force || d.moved;
@@ -1737,18 +1737,23 @@ class Agendo {
 
   // Messages of the validate hooks for `data` ({} when none).
   // ctx.action: 'save' (event form), 'move' or 'resize' (drag and drop).
-  _errors(data, event, action) {
+  // ctx.scope: 'this' | 'following' | 'all' for an occurrence once the scope is chosen, else undefined.
+  _errors(data, event, action, scope) {
     const errors = {};
     const off = this._dayOffChange(data, event);
     if (off) errors.start = this._dayOffMessage(off);
-    for (const p of this._hooks.validate ?? []) Object.assign(errors, p.validate(data, { event: event ?? null, calendar: this, action }) || {});
+    // editPastEvents: false — an event cannot be moved or changed so that it ends in the past.
+    if (!this.o.editPastEvents && event && !isBg(event) && !this._sameDates(data, event) && toDate(data.end) <= new Date()) {
+      errors.start = 'Events cannot be moved into the past';
+    }
+    for (const p of this._hooks.validate ?? []) Object.assign(errors, p.validate(data, { event: event ?? null, calendar: this, action, scope }) || {});
     for (const k of Object.keys(errors)) if (!errors[k]) delete errors[k];
     return errors;
   }
 
   // A drag and drop: refused (with a message) when a validate hook objects.
   _dropAllowed(data, action, event = data) {
-    if (!this._hooks.validate && !this.o.daysOff) return true;
+    if (!this._hooks.validate && !this.o.daysOff && this.o.editPastEvents) return true;
     const errors = this._errors({ ...data }, event, action), first = Object.values(errors)[0];
     if (first) this.notify(first);
     return !first;
@@ -1797,12 +1802,18 @@ class Agendo {
   // event whose dates do not change can still be saved (it was there before the days off were set).
   _dayOffChange(data, event) {
     if (!this.o.daysOff || isBg(data) || (event && isBg(event))) return null;
-    if (event && +toDate(event.start) === +toDate(data.start) && +toDate(event.end) === +toDate(data.end)) return null;
+    if (event && this._sameDates(data, event)) return null;
     return this._dayOffIn(data.start, data.end);
   }
 
   // Whether `date` is a day off (daysOff option), for code that adds events itself.
   isDayOff(date) { return this._isDayOff(toDate(date)); }
+
+  // Same start and end to the minute (the form's date fields have no seconds).
+  _sameDates(a, b) {
+    const m = v => Math.floor(+toDate(v) / 60000);
+    return m(a.start) === m(b.start) && m(a.end) === m(b.end);
+  }
 
   _dayOffMessage(d) { return `${this.fmt.dayLong.format(d)} is a day off`; }
   openEditModal(event) { this._openDialog('Edit Event', event, event.start, event.end); }
@@ -1931,7 +1942,7 @@ class Agendo {
     switch (e.submitter?.value) {
       case 'delete':
         if (ev.recurringId) {
-          this._askScope('Delete recurring event').then(scope => scope && this._deleteScoped(ev, scope));
+          this._askScope('Delete recurring event', true, this._allScopeAllowed(ev)).then(scope => scope && this._deleteScoped(ev, scope));
         } else {
           this.deleteEvent(ev.id);
           this._emitDelete(ev.id);
@@ -1965,8 +1976,9 @@ class Agendo {
           this._emitChange(series, 'edit', { scope: 'all', recurringId: series.id, occurrence: ev.occurrence });
         } else {
           const changed = this._ruleTouched && Agendo.toRRule(rule) !== Agendo.toRRule(ev.recurrence);
-          this._askScope('Edit recurring event', !changed).then(scope =>
-            scope && this._applyScoped(ev, changed ? { ...data, recurrence: rule } : data, scope, 'edit'));
+          const changes = changed ? { ...data, recurrence: rule } : data;
+          this._askScope('Edit recurring event', !changed, this._allScopeAllowed(ev)).then(scope =>
+            scope && this._scopeAllowed(ev, changes, scope, 'edit') && this._applyScoped(ev, changes, scope, 'edit'));
         }
       }
     }
@@ -1975,10 +1987,12 @@ class Agendo {
   // --- Recurring events: which occurrences a change applies to ---
 
   // "This event / This and following events / All events". Resolves to the choice, or null.
-  _askScope(title, allowThis = true) {
+  // allowAll: false when "All events" would change occurrences that have ended (editPastEvents: false).
+  _askScope(title, allowThis = true, allowAll = true) {
     const dlg = this.scopeDialog, f = dlg.querySelector('form').elements;
     dlg.querySelector('.ago-dialog-title').textContent = title;
     dlg.querySelector('[data-scope-this]').hidden = !allowThis;
+    dlg.querySelector('[data-scope-all]').hidden = !allowAll;
     f.scope.value = allowThis ? 'this' : 'following';
     dlg.returnValue = '';
     dlg.showModal();
@@ -1986,9 +2000,26 @@ class Agendo {
       () => resolve(dlg.returnValue === 'ok' ? f.scope.value : null), { once: true }));
   }
 
+  // Whether "All events" may be offered for occurrence `occ`: with editPastEvents: false, not once the
+  // series has an occurrence that ended (it would be changed or deleted too).
+  _allScopeAllowed(occ) {
+    if (this.o.editPastEvents) return true;
+    const series = this.events.find(e => e.id === occ.recurringId);
+    return !series || series.end > new Date();
+  }
+
+  // The validate hooks again, once the scope is known (ctx.scope): for "This event" the other
+  // occurrences of the series are bookings like any other (conflicts plugin).
+  _scopeAllowed(occ, changes, scope, action) {
+    if (!this._hooks.validate) return true;
+    const first = Object.values(this._errors({ ...occ, ...changes }, occ, action, scope))[0];
+    if (first) this.notify(first);
+    return !first;
+  }
+
   async _commitOccurrence(occ, changes, action, revert) {
-    const scope = await this._askScope('Change recurring event');
-    if (scope) return this._applyScoped(occ, changes, scope, action);
+    const scope = await this._askScope('Change recurring event', true, this._allScopeAllowed(occ));
+    if (scope && this._scopeAllowed(occ, changes, scope, action)) return this._applyScoped(occ, changes, scope, action);
     revert?.();
     this._renderEvents();
   }

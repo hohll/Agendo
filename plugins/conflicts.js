@@ -71,10 +71,13 @@
         host.append(mark);
       },
 
-      validate(data, { event }) {
+      validate(data, { event, scope }) {
         if (!block || skip(data) || group(data) == null) return null;
-        // The event itself, and the other occurrences of its series (they may move with it), do not count.
-        const self = event?.id, series = event?.recurringId ?? (event?.recurrence ? event.id : null);
+        // The event itself does not count, nor the other occurrences of its series when they move with
+        // it ("This and following" / "All events", or before the scope is chosen; the core checks again
+        // once it is). For "This event" they are bookings like any other.
+        const self = event?.id;
+        const series = scope === 'this' ? null : event?.recurringId ?? (event?.recurrence ? event.id : null);
         const other = calendar.getOccurrences(data.start, data.end).find(x =>
           x.id !== self && !(series && x.recurringId === series) && !skip(x) && group(x) === group(data) &&
           x.start < data.end && x.end > data.start);
