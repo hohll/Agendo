@@ -145,8 +145,10 @@ function pluginsOf(s) {
   ].filter(Boolean).map(([plugin, code]) => Object.assign(plugin, { code }));
 }
 
-// The dates typed in "Other dates" that read as YYYY-MM-DD, sorted, each once.
-const offDates = text => [...new Set(text.split(/[\s,;]+/).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x) && !isNaN(Date.parse(x))))].sort();
+// The dates typed in "Other dates" that read as YYYY-MM-DD and exist, sorted, each once.
+// A date that does not exist (2026-02-31, which Date.parse turns into 3 March) is dropped.
+const realDate = x => { const [y, m, d] = x.split('-').map(Number), t = new Date(y, m - 1, d); return t.getFullYear() === y && t.getMonth() === m - 1 && t.getDate() === d; };
+const offDates = text => [...new Set(text.split(/[\s,;]+/).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x) && realDate(x)))].sort();
 
 // The daysOff option from the Days off section: Saturday and Sunday together read as 'weekend'.
 function daysOffOf(s) {
