@@ -2133,6 +2133,8 @@ class Agendo {
 
   setResources(resources) {
     this._applyResources(resources);
+    // No resources left: a resource or timeline view on screen gives way to the first view shown.
+    if (!this._viewAllowed(this.o.daysToShow)) this.o.daysToShow = this._firstView();
     this.render();
   }
 

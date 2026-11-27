@@ -343,7 +343,7 @@ Loaded values are given their type: `"12"` becomes `12` for a number, `"true"` b
 | `notify(message, ms?)` | `string, number` | Show a short message at the bottom of the calendar (default 3.5 s). |
 | `redraw()` | — | Draw the events again. |
 | `getResources()` | — | Returns a shallow copy of the resources. |
-| `setResources(resources)` | `Array` | Replace the resource list and re-render. |
+| `setResources(resources)` | `Array` | Replace the resource list and re-render. With an empty list, a resource or timeline view on screen switches to the first view shown. |
 | `getCalendars()` / `setCalendars(calendars)` | `Array` | Read or replace the calendar list. |
 | `getCategories()` / `setCategories(categories)` | `Array` | Read or replace the category list. |
 | `getFilter()` | — | Returns `{ calendars, categories }`: the ids whose events are shown. |
