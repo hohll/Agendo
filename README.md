@@ -135,7 +135,7 @@ const calendar = new Agendo('#calendar-container', {
 | `enableRecurring` | `boolean` | `true` | *Repeat* section in the event form. When `false`, new events cannot repeat; existing recurring events still show, and changing an occurrence still asks this / following / all. |
 | `openEventOn` | `'click' \| 'dblclick'` | `'click'` | The gesture that opens an event (the edit dialog, or `onEventClick`), in every view. `'dblclick'` opens on a second click on the same event within 400 ms, which also works as a double tap on touch screens; a single click then does nothing, so events can be dragged without opening by mistake. |
 | `eventPopover` | `boolean \| Function` | `true` | On mouse hover (after a short pause), a card with the event's title, date and time, repeat rule, resource, calendar, category, `location` and `description`. `false` turns it off (events then get a native tooltip); a function `(event) => Node \| string \| null` supplies your own content (`null` = no popover). |
-| `dialogExpand` | `boolean` | `false` | `true`: when the event form's fields are taller than the window, the dialog widens to two columns (title, all day, repeat and text areas span both). On windows narrower than 640px it stays one column. In every case only the fields scroll: the title bar and the buttons stay in view. |
+| `dialogExpand` | `boolean` | `false` | `true`: when the event form's fields are taller than the window, the dialog widens to two columns (title, all day, repeat and text areas span both). On windows narrower than 640px it stays one column. In every case only the fields scroll: the title bar and the buttons stay in view. On phones, add `interactive-widget=resizes-content` to the page's viewport meta so the on-screen keyboard shrinks the dialog instead of covering its buttons. |
 | `weekNumbers` | `boolean` | `false` | Week numbers in every view: "W47" in the corner of the day / week / resource grids, a column in month view and in each year-view month (click one to open that week), next to the first day of each week in lists, and at week starts in timelines. |
 | `weekNumberCalculation` | `'auto' \| 'ISO' \| 'local' \| Function` | `'auto'` | `'ISO'`: ISO 8601 (weeks start on Monday, week 1 holds the year's first Thursday). `'local'`: weeks start on `firstDayOfWeek`, week 1 holds 1 January (US style). `'auto'`: ISO when `firstDayOfWeek` is Monday, else local. Or `(date) => number`. |
 | `allDaySlot` | `boolean` | `true` | Show the all-day row in the day, week and resource views. |
@@ -356,7 +356,7 @@ Loaded values are given their type: `"12"` becomes `12` for a number, `"true"` b
 | `addEvent(event)` | `Object` | Add a single event and re-render. Returns normalized event. |
 | `updateEvent(id, updates)` | `string, Object` | Update properties on an existing event. |
 | `deleteEvent(id)` | `string` | Remove an event by its ID. |
-| `openCreateModal(start, end, resourceId?)` | `Date, Date, string` | Manually trigger the "New Event" dialog; refused with a message when the dates touch a day off (`daysOff`). |
+| `openCreateModal(start, end, resourceId?, allDay?)` | `Date, Date, string, boolean` | Manually trigger the "New Event" dialog; refused with a message when the dates touch a day off (`daysOff`). |
 | `isDayOff(date)` | `Date \| string` | `true` when the date is a day off (`daysOff` option), for code that adds events itself. |
 | `openEditModal(event)` | `Object` | Manually trigger the "Edit Event" dialog. |
 | `setTheme(name)` | `string \| null` | Switch theme (`null` = default look). |
