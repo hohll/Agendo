@@ -209,7 +209,7 @@ function checkRequest(req) {
     try { same = new URL(origin).host === host; } catch { /* "null" or malformed */ }
     if (!same) refuse(403, 'Cross-origin request refused');
   }
-  if ((req.method === 'POST' || req.method === 'PUT') && !/^application\/json\b/i.test(req.headers['content-type'] ?? '')) {
+  if ((req.method === 'POST' || req.method === 'PUT') && !/^application\/json\s*(;|$)/i.test(req.headers['content-type'] ?? '')) {
     refuse(415, 'Content-Type must be application/json');
   }
 }
@@ -220,7 +220,8 @@ function readBody(req) {
     const chunks = [];
     req.on('data', c => {
       size += c.length;
-      if (size > 1e6) { reject(Object.assign(new Error('Body too large'), { status: 413 })); req.destroy(); }
+      // Too large: stop reading and answer 413 (the connection is closed once the answer is sent).
+      if (size > 1e6) { req.removeAllListeners('data'); reject(Object.assign(new Error('Body too large (1 MB at most)'), { status: 413 })); }
       else chunks.push(c);
     });
     req.on('end', () => {
@@ -233,7 +234,9 @@ function readBody(req) {
 
 // Static files of the demo only: no dot files (.git), nothing from server/ (the database).
 function serveStatic(req, res, pathname) {
-  const rel = decodeURIComponent(pathname === '/' ? '/index.html' : pathname);
+  let rel;
+  try { rel = decodeURIComponent(pathname === '/' ? '/index.html' : pathname); } catch { return send(res, 400, { error: 'Malformed URL' }); }
+  if (rel.includes('\0')) return send(res, 404, { error: 'Not found' });
   const file = path.resolve(ROOT, `.${rel}`);
   const type = TYPES[path.extname(file)];
   if (!file.startsWith(ROOT + path.sep) || rel.split('/').some(p => p.startsWith('.')) ||
@@ -258,7 +261,8 @@ const server = http.createServer(async (req, res) => {
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'Method not allowed' });
       return serveStatic(req, res, url.pathname);
     }
-    const id = match[1] && decodeURIComponent(match[1]);
+    let id;
+    try { id = match[1] && decodeURIComponent(match[1]); } catch { return send(res, 400, { error: 'Malformed URL' }); }
     switch (`${req.method} ${id ? 'item' : 'list'}`) {
       case 'GET list': {
         const from = url.searchParams.get('start'), to = url.searchParams.get('end');
@@ -287,6 +291,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 405, { error: 'Method not allowed' });
     }
   } catch (err) {
+    if (err.status === 413) { res.setHeader('Connection', 'close'); res.on('finish', () => req.destroy()); }
     send(res, err.status || 500, { error: err.status ? err.message : 'Server error' });
     if (!err.status) console.error(err);
   }
