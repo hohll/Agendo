@@ -14,7 +14,8 @@
   const realFetch = window.fetch.bind(window);
   const API = new URL('api/', document.baseURI).pathname;   // e.g. /Agendo/api/ on GitHub Pages
   const DAY = 864e5;
-  let mode = null;   // Promise<'server' | 'browser'>, decided once
+  let mode = null;      // 'server' | 'browser' once decided for good
+  let probing = null;   // the health request in flight
 
   const json = (status, body) => new Response(body === undefined ? null : JSON.stringify(body),
     { status, headers: body === undefined ? {} : { 'Content-Type': 'application/json; charset=utf-8' } });
@@ -22,9 +23,15 @@
 
   // The Node.js server answers api/health with JSON; a static host answers 404 (or an HTML page).
   function detect() {
-    return (mode ??= realFetch(API + 'health', { headers: { Accept: 'application/json' } })
-      .then(r => (r.ok && (r.headers.get('content-type') ?? '').includes('json') ? 'server' : 'browser'))
-      .catch(() => 'browser'));
+    if (mode) return Promise.resolve(mode);
+    return (probing ??= realFetch(API + 'health', { headers: { Accept: 'application/json' } })
+      .then(r => {
+        const json = (r.headers.get('content-type') ?? '').includes('json');
+        if (r.ok && json) mode = 'server';
+        else if (r.status === 404 || r.status === 405 || (r.ok && !json)) mode = 'browser';
+        return mode ?? 'server';
+      }, () => 'server')
+      .finally(() => { probing = null; }));
   }
 
   // --- IndexedDB: one store of rows { id, start_ms, end_ms, recurring, data, updated_at } ---
