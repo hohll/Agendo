@@ -1354,7 +1354,7 @@ class Agendo {
       this.openCreateModal(d.event.start, d.event.end, d.event.resourceId, !!d.event.allDay);
     } else if (!d.moved) {
       this._activate(d.event);
-    } else if (!this._dropAllowed(d.event, d.mode === 'move' ? 'move' : 'resize')) {
+    } else if (!this._dropAllowed(d.event, d.mode === 'move' ? 'move' : 'resize', { ...d.event, ...d.orig })) {   // d.event was moved: the original dates are in d.orig
       Object.assign(d.event, d.orig);
     } else if (d.event.recurringId) {
       const ev = d.event, orig = d.orig;
