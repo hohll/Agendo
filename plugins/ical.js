@@ -69,7 +69,7 @@
       const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:${prodId}`, 'CALSCALE:GREGORIAN'];
       for (const ev of events) {
         const dt = d => (ev.allDay ? `;VALUE=DATE:${date(d)}` : `:${local(d)}`);
-        lines.push('BEGIN:VEVENT', `UID:${ev.id}@agendo`, `DTSTAMP:${now}`, `DTSTART${dt(ev.start)}`, `DTEND${dt(ev.end)}`,
+        lines.push('BEGIN:VEVENT', `UID:${text(ev.id)}@agendo`, `DTSTAMP:${now}`, `DTSTART${dt(ev.start)}`, `DTEND${dt(ev.end)}`,
           `SUMMARY:${text(ev.title ?? '')}`);
         if (ev.location) lines.push(`LOCATION:${text(ev.location)}`);
         if (ev.description) lines.push(`DESCRIPTION:${text(ev.description)}`);
@@ -93,24 +93,27 @@
       return lines.map(fold).join('\r\n') + '\r\n';
     }
 
-    // An event exported by Agendo (UID id@agendo) gets its id back, so importing it again replaces it
-    // instead of adding a copy; other UIDs are prefixed with ics-, and an event without UID gets one.
-    function uidToId(uid) {
+    // An event exported by this calendar (its PRODID, UID <id>@agendo) gets its id back, so importing it
+    // again replaces it instead of adding a copy. Any other UID is prefixed with ics- (a foreign
+    // foo@agendo cannot replace the local event foo), and an event without UID gets one.
+    function uidToId(uid, ours) {
       if (!uid) return `ics-${Math.random().toString(36).slice(2)}`;
-      return uid.endsWith('@agendo') ? uid.slice(0, -'@agendo'.length) : `ics-${uid}`;
+      uid = untext(uid);
+      const bare = uid.endsWith('@agendo') ? uid.slice(0, -'@agendo'.length) : '';
+      return ours && bare ? bare : `ics-${uid}`;
     }
 
     function parse(ics) {
       const lines = String(ics).replace(/\r\n[ \t]|\n[ \t]/g, '').split(/\r?\n/);   // unfold
       const events = [];
-      let cur = null, nested = 0;   // nested: depth of components inside the VEVENT (VALARM…), skipped
+      let cur = null, nested = 0, ours = false;   // ours: the file's PRODID is this calendar's   // nested: depth of components inside the VEVENT (VALARM…), skipped
       for (const line of lines) {
         // Names are case-insensitive (RFC 5545); a VEVENT left without END is kept when the next one
         // or the end of the calendar starts.
         const tag = line.trim().toUpperCase();
         if (tag === 'BEGIN:VEVENT') { if (cur) events.push(cur); cur = { props: {}, exdates: [] }; nested = 0; continue; }
         if (tag === 'END:VEVENT' || tag === 'END:VCALENDAR') { if (cur) events.push(cur); cur = null; continue; }
-        if (!cur) continue;
+        if (!cur) { if (/^PRODID:/i.test(tag)) ours = line.trim().slice(7) === prodId; continue; }
         if (/^BEGIN:/i.test(line)) { nested++; continue; }
         if (/^END:/i.test(line)) { nested = Math.max(0, nested - 1); continue; }
         if (nested) continue;   // an alarm's DESCRIPTION or SUMMARY is not the event's
@@ -131,7 +134,7 @@
       for (const { props, exdates } of events) {
         const start = props.DTSTART && readDate(props.DTSTART.value, props.DTSTART.params);
         const rid = props['RECURRENCE-ID'] && readDate(props['RECURRENCE-ID'].value, props['RECURRENCE-ID'].params)?.date;
-        const baseId = uidToId(props.UID?.value);
+        const baseId = uidToId(props.UID?.value, ours);
         if (rid) skipped.push([baseId, rid]);
         if (!start || (rid && /^CANCELL?ED$/i.test(props.STATUS?.value ?? ''))) continue;
         let end = props.DTEND && readDate(props.DTEND.value, props.DTEND.params)?.date;
