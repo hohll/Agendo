@@ -440,6 +440,7 @@ In the sidebar, the Tabler, Bootstrap and Bulma themes load their framework from
 node server/server.js                    # http://localhost:8000, database server/agendo.db
 node server/server.js --port 3000 --db /tmp/agenda.db
 node server/server.js --reset            # start again from the sample events
+node server/server.js --host 0.0.0.0 --allow-host mypc.local   # reachable from the network by that name
 ```
 
 Without the server (GitHub Pages, `python -m http.server`), `data/browser-api.js` answers the same API from IndexedDB, in your browser only: a new browser database gets the sample events, and the sidebar says *browser database*. The page uses the server whenever `api/health` answers.
@@ -464,7 +465,7 @@ The database file can also be opened with any SQLite tool (`sqlite3 server/agend
 | `DELETE /api/events` | Delete every event → `{ deleted }` |
 | `GET /api/rows?limit=N` | The stored rows as they are (`id`, `start_ms`, `end_ms`, `recurring`, `data`, `updated_at`), last changed first: `{ storage, total, rows }` (`limit` 1–500, default 100) |
 
-Each event is stored whole (custom fields included) with its time span indexed for range queries; dates are ISO instants, all-day ones `YYYY-MM-DD`. A new database gets the sample events of `events.json`, moved to the current week (`--no-seed` to start empty). The server listens on `127.0.0.1` only, serves the demo's files (never `server/` or dot files) and checks what it stores. Its API answers the demo page only: writes need a JSON body and are refused from another origin, and a request for another host name is refused (DNS rebinding). It is a demo, without authentication. The database files are ignored by git.
+Each event is stored whole (custom fields included) with its time span indexed for range queries; dates are ISO instants, all-day ones `YYYY-MM-DD`. A new database gets the sample events of `events.json`, moved to the current week (`--no-seed` to start empty). The server listens on `127.0.0.1` only, serves the demo's files (never `server/` or dot files) and checks what it stores. Its API answers the demo page only: writes need a JSON body and are refused from another origin, and a request for a host name other than `localhost`, an IP address or a name given with `--allow-host` is refused (DNS rebinding), whatever `--host` is. It is a demo, without authentication. The database files are ignored by git.
 
 ### Performance test
 

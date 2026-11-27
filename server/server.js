@@ -4,6 +4,7 @@
  *   node server/server.js --port 3000 --db /tmp/agenda.db
  *   node server/server.js --reset         start from an empty database (then the sample events)
  *   node server/server.js --no-seed       do not add the sample events to a new database
+ *   node server/server.js --host 0.0.0.0 --allow-host mypc.local   reachable from the network by that name
  *
  * Storage: SQLite through Node's built-in node:sqlite (Node 22.13+ / 23.4+); on older versions,
  * a JSON file next to the database path (server/agendo.json).
@@ -187,13 +188,20 @@ function send(res, status, body, type = 'application/json; charset=utf-8') {
 
 // The API answers the demo page only. A page of another site could otherwise send writes:
 // a cross-origin POST with a text/plain body needs no preflight, so writes must be JSON (which
-// does need one, and this server answers none) and must not come from another origin. While the
-// server listens on 127.0.0.1, a Host other than this machine (DNS rebinding) is refused too.
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+// does need one, and this server answers none) and must not come from another origin.
+// DNS rebinding (another site's name pointed at this machine) is refused whatever --host is: the
+// Host must be localhost, an IP address, or a name given with --allow-host name1,name2.
+const ALLOWED_HOSTS = new Set(['localhost', ...(opt('--allow-host', '') || '').split(',').map(h => h.trim().toLowerCase()).filter(Boolean)]);
+function hostAllowed(header) {
+  const m = /^(\[[0-9a-f:.]+\]|[^:\[\]]+)(?::\d+)?$/i.exec(header ?? '');
+  if (!m) return false;
+  const name = m[1].toLowerCase();
+  return ALLOWED_HOSTS.has(name) || name.endsWith('.localhost') || /^\d{1,3}(\.\d{1,3}){3}$/.test(name) || name.startsWith('[');
+}
 function checkRequest(req) {
   const refuse = (status, msg) => { throw Object.assign(new Error(msg), { status }); };
   const host = req.headers.host ?? '';
-  if (HOST === '127.0.0.1' && !LOCAL_HOSTS.has(host.replace(/:\d+$/, ''))) refuse(403, 'Unknown host');
+  if (!hostAllowed(host)) refuse(403, 'Unknown host (start the server with --allow-host <name> to use one)');
   if (req.method === 'GET' || req.method === 'HEAD') return;
   const origin = req.headers.origin;
   if (origin) {
