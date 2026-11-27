@@ -344,6 +344,7 @@ Loaded values are given their type: `"12"` becomes `12` for a number, `"true"` b
 | `notify(message, ms?)` | `string, number` | Show a short message at the bottom of the calendar (default 3.5 s). |
 | `t(key, vars?)` | `string, Object` | A text of the interface in the calendar's language, placeholders filled from `vars` (see [Languages](#-languages)). |
 | `Agendo.addLocale(code, texts)` | `string, Object` | Add a language, or complete one (static). |
+| `Agendo.enterSubmits(form, button)` | `HTMLFormElement, HTMLButtonElement` | Enter in a field of `form` submits it with `button` instead of the form's first button (static). The calendar's own dialogs use it. |
 | `redraw()` | — | Draw the events again. |
 | `getResources()` | — | Returns a shallow copy of the resources. |
 | `setResources(resources)` | `Array` | Replace the resource list and re-render. With an empty list, a resource or timeline view on screen switches to the first view shown. |

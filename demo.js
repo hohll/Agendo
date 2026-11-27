@@ -807,6 +807,9 @@ bgForm.addEventListener('submit', e => {
   renderLists();
 });
 
+// Enter saves (the browser would press the form's first button: Delete).
+Agendo.enterSubmits(bgForm, bgForm.querySelector('[value="save"]'));
+
 document.getElementById('bg-add').addEventListener('click', () => openBgDialog(null));
 bgList.addEventListener('click', e => {
   const btn = e.target.closest('button');
@@ -916,6 +919,9 @@ resForm.addEventListener('submit', e => {
     }
   }
 });
+
+// Enter saves (the browser would press the form's first button: Delete).
+Agendo.enterSubmits(resForm, resForm.querySelector('[value="save"]'));
 
 document.getElementById('res-add').addEventListener('click', () => openResDialog(null));
 resList.addEventListener('click', e => {

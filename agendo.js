@@ -428,6 +428,21 @@ class Agendo {
       this._repeatUI();
     });
     this.form.addEventListener('submit', e => this._onSubmit(e));
+    Agendo.enterSubmits(this.form, this.form.querySelector('[value="save"]'));
+    Agendo.enterSubmits(this.scopeDialog.querySelector('form'), this.scopeDialog.querySelector('[value="ok"]'));
+  }
+
+  // Enter in a field of `form` submits it with `button`. The browser would use the form's first
+  // button instead: the × of the header (closes without saving) or Delete. Not while an input
+  // method is composing (Japanese…), nor in a text area, where Enter is a new line.
+  static enterSubmits(form, button) {
+    form.addEventListener('keydown', e => {
+      const t = e.target;
+      if (e.key !== 'Enter' || e.isComposing || e.defaultPrevented || t.tagName !== 'INPUT'
+        || ['button', 'submit', 'reset', 'image'].includes(t.type)) return;
+      e.preventDefault();
+      form.requestSubmit(button);
+    });
   }
 
   // --- Rendering ---
