@@ -190,7 +190,8 @@ const TYPES = {
 
 function send(res, status, body, type = 'application/json; charset=utf-8') {
   res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
-  res.end(body === undefined ? undefined : type.startsWith('application/json') ? JSON.stringify(body) : body);
+  // A file's bytes (a Buffer, even of a .json file) go as they are; an API answer is turned into JSON.
+  res.end(body === undefined || Buffer.isBuffer(body) || !type.startsWith('application/json') ? body : JSON.stringify(body));
 }
 
 // The API answers the demo page only. A page of another site could otherwise send writes:
