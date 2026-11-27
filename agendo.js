@@ -1657,8 +1657,9 @@ class Agendo {
     let rule = iv === 1 ? t(base) : t(`ruleEvery${unit}`, { n: iv });
     if (r.freq === 'weekly') {
       const days = r.byDay ?? [WD[start.getDay()]];
+      const weekdays = days.map(c => name(c.slice(-2)));   // also given one by one, for a function text
       rule = days.join(',') === 'MO,TU,WE,TH,FR' ? t('ruleOnWeekdays', { rule })
-        : t('ruleOnDays', { rule, days: this._list(days.map(c => name(c.slice(-2)))) });
+        : t('ruleOnDays', { rule, days: this._list(weekdays), weekdays });
     } else if (r.freq === 'monthly') {
       const nth = r.byDay?.find(c => parseInt(c, 10));
       rule = nth ? t('ruleOnNth', { rule, ...this._nth(parseInt(nth, 10), WD.indexOf(nth.slice(-2))) })

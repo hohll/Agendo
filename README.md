@@ -392,7 +392,7 @@ new Agendo('#calendar', { locale: 'en-GB', labels: { newEvent: 'New booking', re
 
 - a string with `{placeholders}`: `dayOff: '{date} is a day off'`;
 - plural forms chosen by `Intl.PluralRules` for `{n}`: `more: { one: '+{n} more', other: '+{n} more' }` (`zero`, `two`, `few`, `many` too, as the language needs; `other` is the fallback);
-- a function `(vars) => string`, for grammar a template cannot do. `locales/it.js` uses one so the ordinal agrees with the weekday ("il primo lunedì", "la prima domenica"): `repeatMonthlyNth` and `ruleOnNth` get `n` (1–5, or -1 for the last) and `weekdayIndex` (0 = Sunday) besides `nth` and `weekday`.
+- a function `(vars) => string`, for grammar a template cannot do. `locales/it.js` uses one so the ordinal agrees with the weekday ("il primo lunedì", "la prima domenica"): `repeatMonthlyNth` and `ruleOnNth` get `n` (1–5, or -1 for the last) and `weekdayIndex` (0 = Sunday) besides `nth` and `weekday`. `ruleOnDays` gets the weekday names one by one in `weekdays` besides the joined `days`: `locales/fr.js` writes "le lundi et le mercredi" with it.
 
 ```javascript
 Agendo.addLocale('nl', { today: 'Vandaag', week: 'Week', more: '+{n} meer' /* … */ });
