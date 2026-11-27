@@ -108,21 +108,35 @@
 
   // --- The API ---
 
-  async function handle(method, url, body) {
+  // Same answers as server/server.js (status codes, checks, row order and size).
+  async function handle(method, url, body, contentType) {
     const database = await db();
     const all = () => run(database, 'events', 'readonly', s => s.getAll());
     const path = url.pathname.slice(API.length);   // 'health', 'rows', 'events', 'events/<id>'
-    const m = /^events(?:\/([^/]+))?\/?$/.exec(path), id = m?.[1] && decodeURIComponent(m[1]);
+    const m = /^events(?:\/([^/]+))?\/?$/.exec(path);
+    let id;
+    try { id = m?.[1] && decodeURIComponent(m[1]); } catch { return json(400, { error: 'Malformed URL' }); }
+    const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);   // binary order, as SQLite sorts text
 
-    if (path === 'health' && method === 'GET') {
+    if (path === 'health') {
       return json(200, { ok: true, storage: 'browser', events: await run(database, 'events', 'readonly', s => s.count()) });
     }
     if (path === 'rows' && method === 'GET') {
       const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 100));
-      const rows = (await all()).sort((a, b) => b.updated_at.localeCompare(a.updated_at) || a.id.localeCompare(b.id));
-      return json(200, { storage: 'browser', total: rows.length, rows: rows.slice(0, limit) });
+      const all_ = (await all()).sort((a, b) => cmp(b.updated_at, a.updated_at) || cmp(a.id, b.id));
+      const rows = [];
+      let size = 0, truncated = false;
+      for (const r of all_.slice(0, limit)) {
+        size += JSON.stringify(r).length;
+        if (size > 5e6 && rows.length) { truncated = true; break; }
+        rows.push(r);
+      }
+      return json(200, { storage: 'browser', total: all_.length, rows, truncated });
     }
     if (!m) return json(404, { error: 'Not found' });
+    if ((method === 'POST' || method === 'PUT') && !/^application\/json\s*(;|$)/i.test(contentType ?? '')) {
+      return json(415, { error: 'Content-Type must be application/json' });
+    }
 
     switch (`${method} ${id ? 'item' : 'list'}`) {
       case 'GET list': {
@@ -146,15 +160,20 @@
         await run(database, 'events', 'readwrite', s => s.put(row(ev)));
         return json(id ? 200 : 201, ev);
       }
-      case 'DELETE item': {
-        const had = await run(database, 'events', 'readonly', s => s.count(id));
-        if (!had) return json(404, { error: 'No such event' });
-        await run(database, 'events', 'readwrite', s => s.delete(id));
-        return json(204);
+      case 'DELETE item': {   // count and delete in one transaction (two tabs cannot both delete it)
+        const had = await run(database, 'events', 'readwrite', s => {
+          const c = s.count(id);
+          c.onsuccess = () => { if (c.result) s.delete(id); };
+          return c;
+        });
+        return had ? json(204) : json(404, { error: 'No such event' });
       }
       case 'DELETE list': {
-        const n = await run(database, 'events', 'readonly', s => s.count());
-        await run(database, 'events', 'readwrite', s => s.clear());
+        const n = await run(database, 'events', 'readwrite', s => {
+          const c = s.count();
+          c.onsuccess = () => s.clear();
+          return c;
+        });
         return json(200, { deleted: n });
       }
       default:
@@ -162,14 +181,16 @@
     }
   }
 
-  window.fetch = async function (input, init = {}) {
+  window.fetch = async function (input, init) {
+    init ??= {};
     const req = input instanceof Request ? input : null;
     const url = new URL(req ? req.url : String(input), document.baseURI);
     if (url.origin !== location.origin || !url.pathname.startsWith(API)) return realFetch(input, init);
     if ((await detect()) === 'server') return realFetch(input, init);
     const method = (init.method ?? req?.method ?? 'GET').toUpperCase();
     try {
-      return await handle(method, url, init.body ?? (req ? await req.text() : undefined));
+      const contentType = new Headers(init.headers ?? req?.headers).get('content-type');
+      return await handle(method, url, init.body ?? (req ? await req.text() : undefined), contentType);
     } catch (err) {
       if (err instanceof SyntaxError) return json(400, { error: 'Invalid JSON' });
       return json(err.status || 500, { error: err.status ? err.message : `Browser database unavailable: ${err.message ?? err}` });
