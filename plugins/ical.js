@@ -92,6 +92,13 @@
       return lines.map(fold).join('\r\n') + '\r\n';
     }
 
+    // An event exported by Agendo (UID id@agendo) gets its id back, so importing it again replaces it
+    // instead of adding a copy; other UIDs are prefixed with ics-, and an event without UID gets one.
+    function uidToId(uid) {
+      if (!uid) return `ics-${Math.random().toString(36).slice(2)}`;
+      return uid.endsWith('@agendo') ? uid.slice(0, -'@agendo'.length) : `ics-${uid}`;
+    }
+
     function parse(ics) {
       const lines = String(ics).replace(/\r\n[ \t]|\n[ \t]/g, '').split(/\r?\n/);   // unfold
       const events = [];
@@ -100,6 +107,9 @@
         if (line === 'BEGIN:VEVENT') { cur = { props: {}, exdates: [] }; nested = 0; continue; }
         if (line === 'END:VEVENT') { if (cur) events.push(cur); cur = null; continue; }
         if (!cur) continue;
+        if (/^BEGIN:/i.test(line)) { nested++; continue; }
+        if (/^END:/i.test(line)) { nested = Math.max(0, nested - 1); continue; }
+        if (nested) continue;   // an alarm's DESCRIPTION or SUMMARY is not the event's
         const colon = line.search(/:(?=(?:[^"]*"[^"]*")*[^"]*$)/);
         if (colon < 0) continue;
         const [name, ...rawParams] = line.slice(0, colon).split(';');
@@ -107,9 +117,6 @@
         const value = line.slice(colon + 1), key = name.toUpperCase();
         if (key === 'EXDATE') cur.exdates.push(...value.split(',').map(v => readDate(v, params)?.date).filter(Boolean));
         else cur.props[key] = { value, params };
-        if (/^BEGIN:/i.test(line)) { nested++; continue; }
-        if (/^END:/i.test(line)) { nested = Math.max(0, nested - 1); continue; }
-        if (nested) continue;   // an alarm's DESCRIPTION or SUMMARY is not the event's
       }
 
       const out = [];
@@ -120,7 +127,7 @@
         if (!end && props.DURATION) end = new Date(+start.date + duration(props.DURATION.value));
         const x = k => props[`X-AGENDO-${k}`] && untext(props[`X-AGENDO-${k}`].value);
         const ev = {
-          id: `ics-${(props.UID?.value ?? Math.random().toString(36).slice(2)).replace(/@agendo$/, '')}`,
+          id: uidToId(props.UID?.value),
           title: props.SUMMARY ? untext(props.SUMMARY.value) : '',
           allDay: start.allDay,
           start: start.date,
