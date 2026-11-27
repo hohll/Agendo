@@ -195,6 +195,7 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;          /* a fieldset grows to its widest content (code blocks) otherwise */
   margin: 0;
   padding: 16px 0;
   border: 0;
@@ -285,7 +286,8 @@ h1 {
 /* Options code */
 .customize-code { padding-top: 16px; }
 .customize-code summary { font-size: 0.85rem; font-weight: 600; cursor: pointer; }
-.customize-code pre {
+.customize-code pre,
+.model-code pre {
   margin: 10px 0 8px;
   padding: 10px;
   overflow-x: auto;
@@ -403,4 +405,7 @@ h1 {
 .chips:has(input:disabled) { opacity: 0.5; }
 
 .storage-status { display: block; margin-top: -6px; font-size: 0.75rem; color: var(--muted); }
+.model-code { margin-top: -6px; }
+.model-code summary { font-size: 0.75rem; color: var(--muted); cursor: pointer; }
+.model-code pre { margin: 6px 0 0; }
 .storage-status code { font-size: 0.72rem; padding: 1px 4px; background: var(--hover-bg); border-radius: 4px; }

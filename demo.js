@@ -46,6 +46,23 @@ const DEMO_MODEL = {
   ],
   order: ['title', 'location', 'priority']
 };
+// A value as JavaScript source, functions included, to show the example model as code.
+function toCode(v, indent = '') {
+  const inner = indent + '  ';
+  if (typeof v === 'function') return v.toString();
+  if (typeof v === 'string') return `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+  if (Array.isArray(v)) {
+    if (v.every(x => typeof x !== 'object' || x === null)) return `[${v.map(x => toCode(x)).join(', ')}]`;
+    return `[\n${v.map(x => inner + toCode(x, inner)).join(',\n')}\n${indent}]`;
+  }
+  if (v && typeof v === 'object') {
+    const props = Object.entries(v).map(([k, x]) => `${k}: ${toCode(x, inner)}`);
+    const flat = `{ ${props.join(', ')} }`;
+    return flat.length <= 90 && !flat.includes('\n') ? flat : `{\n${props.map(x => inner + x).join(',\n')}\n${indent}}`;
+  }
+  return String(v);
+}
+
 const TIMELINE_CUSTOM = { days: 3, slotMinutes: 30, labelMinutes: 60, label: '3 days' };
 const ALL_VIEWS = ['day', 'workweek', 'week', 'month', 'year', 'list', 'resource', 'timeline'];
 
@@ -107,6 +124,9 @@ function saveSettings() {
 
 let settings = loadSettings();
 
+// The example model, shown under its switch.
+document.getElementById('data-model-code').textContent = `Agendo.eventDataModel(${toCode(DEMO_MODEL)})`;
+
 // The plugins the Plugins section turns on, with the code to show for each.
 function pluginsOf(s) {
   return [
@@ -116,7 +136,7 @@ function pluginsOf(s) {
       `Agendo.conflicts({ by: 'resource'${s.conflictsBlock ? '' : ', block: false'} })`],
     s.ical && [Agendo.ical({ filename: 'agendo-demo.ics' }), "Agendo.ical({ filename: 'agendo-demo.ics' })"],
     s.timeProgress && [Agendo.timeProgress(), 'Agendo.timeProgress()'],
-    s.dataModel && [Agendo.eventDataModel(DEMO_MODEL), `Agendo.eventDataModel({ fields: [ /* ${DEMO_MODEL.fields.length} fields */ ] })`],
+    s.dataModel && [Agendo.eventDataModel(DEMO_MODEL), `Agendo.eventDataModel(${toCode(DEMO_MODEL, '    ')})`],
     s.storage && [Agendo.restStorage({ url: 'api/events' }), "Agendo.restStorage({ url: '/api/events' })"]
   ].filter(Boolean).map(([plugin, code]) => Object.assign(plugin, { code }));
 }

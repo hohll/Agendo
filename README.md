@@ -300,7 +300,7 @@ new Agendo('#calendar', {
 | `badge` | Show the value on the event: `true` (the value, a select option's label and `color`), a string (that text when the value is set), or `(value, event) => text \| null`. |
 | `popover` | Show the field in the hover card (`location` and `description` already are). |
 
-Loaded values are given their type: `"12"` becomes `12` for a number, `"true"` becomes `true` for a checkbox, a select value outside its options takes the default. In the demo, *Customize → Plugins → Custom fields* turns this plugin on with an example model.
+Loaded values are given their type: `"12"` becomes `12` for a number, `"true"` becomes `true` for a checkbox, a select value outside its options takes the default. In the demo, *Customize → Plugins → Custom fields* turns this plugin on with an example model; *Example model* under the switch shows its code, and *Options code* includes it when the plugin is on.
 
 ## 📖 Public API Methods
 
