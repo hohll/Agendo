@@ -323,6 +323,9 @@ class Agendo {
     // Dropdowns: only one open at a time; close on outside click or Escape.
     const menus = [...this.el.querySelectorAll('.ago-dropdown')];
     menus.forEach(m => m.addEventListener('toggle', () => m.open && menus.forEach(o => o !== m && (o.open = false))));
+    // Narrow layout (.ago-narrow, see agendo.css) while the calendar itself is under 640px wide.
+    this._ro = new ResizeObserver(([entry]) => this.el.classList.toggle('ago-narrow', entry.contentRect.width < 640));
+    this._ro.observe(this.el);
     this._onWinResize = () => this._fitDialog();
     window.addEventListener('resize', this._onWinResize);
     this.form.addEventListener('change', () => this._fitDialog());   // e.g. Repeat → Custom shows more fields
@@ -2323,8 +2326,9 @@ class Agendo {
     this._hidePopover();
     document.removeEventListener('pointerdown', this._onDocPointer);
     window.removeEventListener('resize', this._onWinResize);
+    this._ro.disconnect();
     this.el.replaceChildren();
-    this.el.classList.remove('agendo');
+    this.el.classList.remove('agendo', 'ago-narrow');
     this.setTheme(null);
     this.setColorScheme(null);
   }
