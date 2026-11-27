@@ -14,7 +14,8 @@
  * as X-AGENDO-* properties, so a round trip keeps them. Events from plugin sources (holidays)
  * are not part of the data and are not exported.
  * Import: VEVENTs with DTSTART / DTEND or DURATION, all-day dates, UTC times (…Z), RRULE, EXDATE,
- * SUMMARY, LOCATION, DESCRIPTION, UID and the X-AGENDO-* properties. Times with a TZID are read
+ * SUMMARY, LOCATION, DESCRIPTION, UID, RECURRENCE-ID (an edited occurrence becomes a skipped date of
+ * its series plus an event of its own; a cancelled one is only skipped) and the X-AGENDO-* properties. Times with a TZID are read
  * as local times.
  */
 (function () {
@@ -122,15 +123,22 @@
         else cur.props[key] = { value, params };
       }
 
-      const out = [];
+      // An edited occurrence of a series comes as another VEVENT with the same UID and a RECURRENCE-ID
+      // (Google, Outlook): it becomes a date skipped by the series plus an event of its own, with the id
+      // Agendo gives its own exceptions (<series id>-YYYY-MM-DD); a cancelled one is only skipped.
+      const byId = new Map(), skipped = [];
+      const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
       for (const { props, exdates } of events) {
         const start = props.DTSTART && readDate(props.DTSTART.value, props.DTSTART.params);
-        if (!start) continue;
+        const rid = props['RECURRENCE-ID'] && readDate(props['RECURRENCE-ID'].value, props['RECURRENCE-ID'].params)?.date;
+        const baseId = uidToId(props.UID?.value);
+        if (rid) skipped.push([baseId, rid]);
+        if (!start || (rid && /^CANCELL?ED$/i.test(props.STATUS?.value ?? ''))) continue;
         let end = props.DTEND && readDate(props.DTEND.value, props.DTEND.params)?.date;
         if (!end && props.DURATION) end = new Date(+start.date + duration(props.DURATION.value));
         const x = k => props[`X-AGENDO-${k}`] && untext(props[`X-AGENDO-${k}`].value);
         const ev = {
-          id: uidToId(props.UID?.value),
+          id: rid ? `${baseId}-${dayKey(rid)}` : baseId,
           title: props.SUMMARY ? untext(props.SUMMARY.value) : '',
           allDay: start.allDay,
           start: start.date,
@@ -141,10 +149,11 @@
         for (const [k, f] of [['RESOURCE', 'resourceId'], ['CALENDAR', 'calendarId'], ['CATEGORY', 'categoryId'], ['COLOR', 'color'], ['DISPLAY', 'display']]) {
           if (x(k)) ev[f] = x(k);
         }
-        if (props.RRULE) ev.recurrence = { ...Agendo.parseRRule(props.RRULE.value), exdates };
-        out.push(ev);
+        if (props.RRULE && !rid) ev.recurrence = { ...Agendo.parseRRule(props.RRULE.value), exdates };
+        byId.set(ev.id, ev);   // the same UID twice: the later one wins, ids stay unique
       }
-      return out;
+      for (const [id, date] of skipped) byId.get(id)?.recurrence?.exdates.push(date);
+      return [...byId.values()];
     }
 
     // Adds the events of an .ics text (an event whose id is already there is replaced).
