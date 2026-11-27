@@ -482,6 +482,14 @@ Agendo stands on the shoulders of two projects:
 - **[simple-week-calendar-js](https://github.com/markmclaren/simple-week-calendar-js)** by [Mark McLaren](https://github.com/markmclaren): the zero-dependency Vanilla JavaScript week calendar that Agendo was forked from. Its time grid, drag to create, move and resize, overlap layout, event dialog and demo are the foundation everything else was built on. Thank you, Mark!
 - **[jquery-week-calendar](https://github.com/themouette/jquery-week-calendar)** by [Rob Monie / themouette](https://github.com/themouette): the classic jQuery plugin that simple-week-calendar-js modernized and rewrote without jQuery, jQuery UI or Moment.js.
 
+The ready-made themes and the demo rely on three CSS frameworks, all under the MIT License. The theme files in `themes/` only map the calendar onto each framework's own variables; the frameworks themselves are not bundled, the demo loads them from the jsDelivr CDN:
+
+- **[Tabler](https://tabler.io)** ([tabler/tabler](https://github.com/tabler/tabler)) by Paweł Kuna and contributors: `themes/tabler.css`, for `@tabler/core` 1.x.
+- **[Bootstrap](https://getbootstrap.com)** ([twbs/bootstrap](https://github.com/twbs/bootstrap)) by the Bootstrap team and contributors: `themes/bootstrap.css`, for Bootstrap 5.3.
+- **[Bulma](https://bulma.io)** ([jgthms/bulma](https://github.com/jgthms/bulma)) by Jeremy Thomas and contributors: `themes/bulma.css`, for Bulma 1.x.
+
+The export and import buttons of the iCalendar plugin use the *download* and *upload* icons of **[Tabler Icons](https://tabler.io/icons)** (MIT License).
+
 On top of that base, Agendo adds the month, year and list views, resource columns and timelines, calendar and category filters, configurable view buttons, theming (Tabler, Bootstrap, Bulma) and the Customize demo sidebar.
 
 Released under the [MIT License](LICENSE), keeping the copyright notice of the original project.
