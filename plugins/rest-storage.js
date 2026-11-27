@@ -89,7 +89,8 @@
       },
       save,
       remove,
-      health: () => fetch(new URL('../health', new URL(url + '/', location.href)), { headers }).then(r => r.json()),
+      health: () => fetch(new URL('../health', new URL(url + '/', location.href)), { headers })
+        .then(r => (r.ok ? r.json() : r.json().catch(() => ({})).then(b => { throw new Error(b.error ?? `HTTP ${r.status}`); }))),
       get pending() { return pending; }
     };
   }
