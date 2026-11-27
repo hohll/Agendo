@@ -168,6 +168,55 @@ function daysOffOf(s) {
   return !list.length ? null : list.length === 1 && weekend ? 'weekend' : list;
 }
 
+// --- Sample data in the language of Customize → Locale (data/sample-texts.js) ---
+// English is the data itself. A text is switched only while it is still one of the sample texts (in
+// any language): an event you renamed keeps your text. Events from the database are left as stored.
+
+const sampleLang = s => (s.locale || navigator.language).toLowerCase().split('-')[0];
+const sampleTexts = s => SAMPLE_TEXTS[sampleLang(s)] ?? null;
+
+// Calendars or categories with their names in the language.
+const sampleNames = (list, kind, s) => list.map(x => ({ ...x, title: sampleTexts(s)?.[kind][x.id] ?? x.title }));
+
+let sampleEnglish = null;   // id → { title, location?, description? } of events.json, kept at its first load
+
+// What each sample text can read, per event id and field, in every language.
+function sampleVariants() {
+  const known = new Map();
+  for (const [id, en] of Object.entries(sampleEnglish ?? {})) {
+    for (const [field, text] of Object.entries(en)) {
+      const all = [text, ...Object.values(SAMPLE_TEXTS).map(l => l.events[id]?.[field]).filter(Boolean)];
+      known.set(`${id}:${field}`, new Set(all));
+    }
+  }
+  return known;
+}
+
+// The sample events (and the performance test's) in the language of `s`; others are returned as is.
+function localizeEvents(events, s = settings) {
+  const lang = sampleTexts(s), known = sampleVariants();
+  const generated = lang?.generated ?? generateEvents.TITLES;
+  const anyGenerated = new Map([generateEvents.TITLES, ...Object.values(SAMPLE_TEXTS).map(l => l.generated)]
+    .flatMap(list => list.map((t, i) => [t, i])));
+  return events.map(ev => {
+    // A sample event, or a part of a sample series split off by "This and following events" (id "1-2026-11-12").
+    const id = String(ev.id).match(/^(\d+)(?:-\d{4}-\d{2}-\d{2})*$/)?.[1];
+    if (id && sampleEnglish?.[id]) {
+      const changes = {};
+      for (const [field, en] of Object.entries(sampleEnglish[id])) {
+        if (!known.get(`${id}:${field}`).has(ev[field])) continue;   // renamed: keep it
+        const text = lang?.events[id]?.[field] ?? en;
+        if (text !== ev[field]) changes[field] = text;
+      }
+      return Object.keys(changes).length ? { ...ev, ...changes } : ev;
+    }
+    // A performance test event: "<title> #<n>".
+    const m = /^t\d+$/.test(ev.id) && /^(.*) #(\d+)$/.exec(ev.title ?? '');
+    const i = m ? anyGenerated.get(m[1]) : undefined;
+    return i === undefined || generated[i] === m[1] ? ev : { ...ev, title: `${generated[i]} #${m[2]}` };
+  });
+}
+
 // Calendar options from the settings.
 function toOptions(s) {
   return {
@@ -188,8 +237,8 @@ function toOptions(s) {
     monthMaxEvents: s.monthMaxEvents,
     resources: s.resources ? s.resourceList : [],
     timelineCustom: s.timelineCustom ? TIMELINE_CUSTOM : null,
-    calendars: s.filters ? CALENDARS : [],
-    categories: s.filters ? CATEGORIES : [],
+    calendars: s.filters ? sampleNames(CALENDARS, 'calendars', s) : [],
+    categories: s.filters ? sampleNames(CATEGORIES, 'categories', s) : [],
     readonly: s.readonly,
     enableCreate: s.enableCreate,
     enableMove: s.enableMove,
@@ -207,7 +256,7 @@ function toOptions(s) {
 
 // --- Calendar ---
 
-let calendar, builtWithStorage = null;
+let calendar, builtWithStorage = null, builtLang = null;
 
 function buildCalendar() {
   // Carry the current state over to the new calendar.
@@ -223,6 +272,9 @@ function buildCalendar() {
   // Database storage on or off: the events come from the database, or back from the samples.
   const storageChanged = builtWithStorage !== null && builtWithStorage !== settings.storage;
   if (prev && storageChanged) prev.events = [];
+  // Another language: the sample events still showing a sample text switch to it (not the database's).
+  if (prev && !settings.storage && builtLang !== null && builtLang !== sampleLang(settings)) prev.events = localizeEvents(prev.events);
+  builtLang = sampleLang(settings);
 
   const opts = toOptions(settings);
   // Items unticked in the Filter menu stay unticked.
@@ -945,7 +997,7 @@ async function loadTest() {
   perfResults.textContent = `Generating ${num(n)} events…`;
   await nextPaint();
   const t0 = performance.now();
-  let events = generateEvents(n, { days, isDayOff: d => calendar.isDayOff(d) });   // none on the days off
+  let events = generateEvents(n, { days, isDayOff: d => calendar.isDayOff(d), titles: sampleTexts(settings)?.generated });   // none on the days off
   if (!events.length) {
     perfResults.textContent = 'No event generated: every day of that period is a day off (Customize → Days off).';
     return;
@@ -1053,7 +1105,12 @@ function shiftToThisWeek(events) {
 function loadSample() {
   return fetch('events.json')
     .then(r => r.json())
-    .then(data => { calendar.setEvents(shiftToThisWeek(data)); renderLists(); })
+    .then(data => {
+      sampleEnglish ??= Object.fromEntries(data.map(e => [e.id, Object.fromEntries(
+        ['title', 'location', 'description'].filter(k => e[k]).map(k => [k, e[k]]))]));
+      calendar.setEvents(localizeEvents(shiftToThisWeek(data)));
+      renderLists();
+    })
     .catch(err => console.warn('Could not load events.json (serve over HTTP):', err));
 }
 if (!settings.storage) loadSample();

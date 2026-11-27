@@ -4,6 +4,7 @@
  *   <script src="data/generate-events.js"></script>
  *   generateEvents(1000, { days: 365, center: new Date() })  → events with Date objects
  *   generateEvents(1000, { isDayOff: d => calendar.isDayOff(d) })   no event on a day off
+ *   generateEvents(1000, { titles: [...] })   titles in another language (generateEvents.TITLES' order)
  *
  * Events spread over `days` days centred on `center`: timed ones between 7:00 and 19:00 lasting
  * 15 minutes to 2 hours, about 4 % all-day (1 to 3 days), over 3 desks, 2 calendars, 4 categories.
@@ -27,7 +28,7 @@
     };
   }
 
-  function generateEvents(count, { days = 365, center = new Date(), seed = 42, isDayOff = null } = {}) {
+  function generateEvents(count, { days = 365, center = new Date(), seed = 42, isDayOff = null, titles = TITLES } = {}) {
     const r = random(seed + count), pick = list => list[Math.floor(r() * list.length)];
     const y = center.getFullYear(), m = center.getMonth(), d0 = center.getDate() - Math.floor(days / 2);
     // The days events may be on (offsets from d0), and whether a day is off.
@@ -40,7 +41,7 @@
       const day = d0 + pick(open);
       const ev = {
         id: `t${i}`,
-        title: `${pick(TITLES)} #${i + 1}`,
+        title: `${pick(titles)} #${i + 1}`,
         resourceId: pick(RESOURCES),
         calendarId: r() < 0.8 ? 'work' : 'personal',
         categoryId: pick(CATEGORIES)
@@ -63,5 +64,6 @@
     return out;
   }
 
+  generateEvents.TITLES = TITLES;
   root.generateEvents = generateEvents;
 })(this);
