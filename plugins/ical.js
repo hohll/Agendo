@@ -104,8 +104,11 @@
       const events = [];
       let cur = null, nested = 0;   // nested: depth of components inside the VEVENT (VALARM…), skipped
       for (const line of lines) {
-        if (line === 'BEGIN:VEVENT') { cur = { props: {}, exdates: [] }; nested = 0; continue; }
-        if (line === 'END:VEVENT') { if (cur) events.push(cur); cur = null; continue; }
+        // Names are case-insensitive (RFC 5545); a VEVENT left without END is kept when the next one
+        // or the end of the calendar starts.
+        const tag = line.trim().toUpperCase();
+        if (tag === 'BEGIN:VEVENT') { if (cur) events.push(cur); cur = { props: {}, exdates: [] }; nested = 0; continue; }
+        if (tag === 'END:VEVENT' || tag === 'END:VCALENDAR') { if (cur) events.push(cur); cur = null; continue; }
         if (!cur) continue;
         if (/^BEGIN:/i.test(line)) { nested++; continue; }
         if (/^END:/i.test(line)) { nested = Math.max(0, nested - 1); continue; }
